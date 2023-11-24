@@ -43,7 +43,7 @@ void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
   }
 
   for (int x{x0}; x < x1; x++) {
-    int y = y0 + (x - x0)*(y1 - y0)/(float)(x1 - x0);
+    int y = y0 + (x - x0)*(y1 - y0)/(float)(x1 - x0); // y = y0 + m*Dx
 
     if (steep) image.set(y, x, color);
     else image.set(x, y, color);
