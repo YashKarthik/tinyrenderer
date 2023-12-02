@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <cmath>
+#include <valarray>
 #include <vector>
 #include "model.h"
 #include "geometry.h"
@@ -20,6 +21,7 @@ Model *model = NULL;
 
 void triangle(Vec2i t0, Vec2i t1, Vec2i t2, TGAImage &image, TGAColor color);
 void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color);
+Vec3f barycentric(Vec2i *pts, Vec2i P);
 
 int main(int argc, char** argv) {
   //if (argc == 2) {
@@ -28,28 +30,31 @@ int main(int argc, char** argv) {
   //  model = new Model("./obj/african_head.obj");
   //}
 
-  model = new Model("./obj/african_head.obj");
-  TGAImage image(width, height, TGAImage::RGB);
-  Vec3f light_dir(0,0,-1);
+  //model = new Model("./obj/diablo3_pose.obj");
+  //TGAImage image(width, height, TGAImage::RGB);
+  //Vec3f light_dir(0,0,-1);
 
-  for (int i=0; i<model->nfaces(); i++) {
-    std::cout << "..." << std::endl;
-    std::vector<int> face = model->face(i);
-    Vec2i screen_coords[3];
-    Vec3f world_coords[3];
-    for (int j=0; j<3; j++) {
-      std::cout << "...." << std::endl;
-      Vec3f v = model->vert(face[j]);
-      screen_coords[j] = Vec2i((v.x+1.)*width/2., (v.y+1.)*height/2.);
-      world_coords[j]  = v;
-    }
-    Vec3f n = (world_coords[2]-world_coords[0])^(world_coords[1]-world_coords[0]);
-    n.normalize();
-    float intensity = n*light_dir;
-    if (intensity>0) {
-      triangle(screen_coords[0], screen_coords[1], screen_coords[2], image, TGAColor(intensity*255, intensity*255, intensity*255, 255));
-    }
-  }
+  //for (int i=0; i<model->nfaces(); i++) {
+  //  std::cout << "..." << std::endl;
+  //  std::vector<int> face = model->face(i);
+  //  Vec2i screen_coords[3];
+  //  Vec3f world_coords[3];
+  //  for (int j=0; j<3; j++) {
+  //    std::cout << "...." << std::endl;
+  //    Vec3f v = model->vert(face[j]);
+  //    screen_coords[j] = Vec2i((v.x+1.)*width/2., (v.y+1.)*height/2.);
+  //    world_coords[j]  = v;
+  //  }
+  //  Vec3f n = (world_coords[2]-world_coords[0])^(world_coords[1]-world_coords[0]);
+  //  n.normalize();
+  //  float intensity = n*light_dir;
+  //  if (intensity>0) {
+  //    triangle(screen_coords[0], screen_coords[1], screen_coords[2], image, TGAColor(intensity*255, intensity*255, intensity*255, 255));
+  //  }
+  //}
+
+
+  TGAImage image(100, 100, TGAImage::RGB);
 
   image.flip_vertically();
   image.write_tga_file("output.tga");
@@ -77,6 +82,23 @@ void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
     if (steep) image.set(y, x, color);
     else image.set(x, y, color);
   }
+}
+
+
+Vec3f barycentric(Vec2i *pts, Vec2i P) {
+  Vec3f area = Vec3f(
+    pts[2].x - pts[0].x,
+    pts[1].x - pts[0].x,
+    pts[0].x - pts[0].x
+  ) ^ Vec3f(
+      pts[2].y - pts[0].y,
+      pts[1].y - pts[0].y,
+      pts[0].y - pts[0].y
+  );
+
+  if (std::abs(area.z) < 1) return Vec3f(-1, 1, 1);
+  return Vec3f(1.f-(area.x + area.y)/area.z, area.y/area.z, area.x/area.z);
+
 }
 
 void triangle(Vec2i t0, Vec2i t1, Vec2i t2, TGAImage &image, TGAColor color) { 
