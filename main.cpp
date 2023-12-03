@@ -85,19 +85,52 @@ void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
 }
 
 
+/* Returns the barycentric coordinates of a point>
+ * If any of the barycentric coordinates (the masses)
+ * are negative, then the point P is outside the triangle.
+ *
+ * The cartesian coordinates of P are the weighted average of the corners of the triangle.
+ * The "weights" are the barycentric coordinates.
+ *
+ * x = ux_1 + vx_2 + (1 - u - v)x_3
+ * y = uy_1 + vy_2 + (1 - u - v)y_3
+ * We replace the third weight with the expr since the sum of weights needs to be 1.
+ *
+ * Rearranging:
+ * 0 = (x_3 - x) + u(x_1 - x_3) + v(x_2 - x_3)
+ * 0 = (y_3 - y) + u(y_1 - y_3) + v(y_2 - y_3)
+ *
+ * Rewriting as matrix-vector product:
+ * [1 u v][x_3 - x  x_1 - x_3   x_2 - x_3]^T = 0
+ * [1 u v][y_3 - y  y_1 - y_3   y_2 - y_3]^T = 0
+ *
+ * So we need a vector that is perpendicular to both
+ * [x_3 - x  x_1 - x_3   x_2 - x_3]^T and [y_3 - y  y_1 - y_3   y_2 - y_3]^T
+ * => [1 u v] =(approx) [x_3 - x  x_1 - x_3   x_2 - x_3]^T \cross [y_3 - y  y_1 - y_3   y_2 - y_3]^T
+ **/
 Vec3f barycentric(Vec2i *pts, Vec2i P) {
-  Vec3f area = Vec3f(
+
+  // Since our vectors are 2D
+  Vec3f cross = Vec3f(
     pts[2].x - pts[0].x,
     pts[1].x - pts[0].x,
-    pts[0].x - pts[0].x
+    pts[0].x - P.x
   ) ^ Vec3f(
       pts[2].y - pts[0].y,
       pts[1].y - pts[0].y,
-      pts[0].y - pts[0].y
+      pts[0].y - P.y
   );
 
-  if (std::abs(area.z) < 1) return Vec3f(-1, 1, 1);
-  return Vec3f(1.f-(area.x + area.y)/area.z, area.y/area.z, area.x/area.z);
+  // Points are colinear => zero area => return neg to signify point is outside
+  if (std::abs(cross.z) == 0) return Vec3f(-1, 1, 1);
+
+  // div by z to scale it down so that sum is 1
+  // The third coordinate is = 1 - (u + v)
+  return Vec3f(
+    1.f - (cross.x + cross.y)/cross.z,
+    cross.y/cross.z,
+    cross.x/cross.z
+  );
 
 }
 
