@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <iostream>
 #include <fstream>
 #include <cmath>
@@ -19,6 +20,7 @@ const int height = 800;
 
 Model *model = NULL;
 
+void triangle(Vec2i *pts, TGAImage &image, TGAColor color); // the new version
 void triangle(Vec2i t0, Vec2i t1, Vec2i t2, TGAImage &image, TGAColor color);
 void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color);
 Vec3f barycentric(Vec2i *pts, Vec2i P);
@@ -131,7 +133,25 @@ Vec3f barycentric(Vec2i *pts, Vec2i P) {
     cross.y/cross.z,
     cross.x/cross.z
   );
+}
 
+
+void triangle(Vec2i *pts, TGAImage &image, TGAColor color) {
+  Vec2i bounding_box_min(image.get_width() - 1, image.get_height() - 1);
+  Vec2i bounding_box_max(0, 0);
+
+  // go over each point and store the lowest, highest possible x-cord and y-cord
+  for (int i{0}; i < 3; i++) {
+    // comparing the current cordinate with the smallest cordinate encountered so far.
+    bounding_box_min.x = std::max(0, std::min(pts[i].x, bounding_box_min.x));
+    bounding_box_min.y = std::max(0, std::min(pts[i].y, bounding_box_min.y));
+    // wrapped in additional std::max to ensure vals are > 0
+
+    // comparing the current point with the largest coordinate encountered so far
+    bounding_box_max.x = std::min(0, std::max(pts[i].x, bounding_box_max.x));
+    bounding_box_max.y = std::min(0, std::max(pts[i].y, bounding_box_max.y));
+    // wrapped in additional std::min to ensure vals are > 0
+  }
 }
 
 void triangle(Vec2i t0, Vec2i t1, Vec2i t2, TGAImage &image, TGAColor color) { 
