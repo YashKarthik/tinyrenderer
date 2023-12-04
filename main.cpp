@@ -57,6 +57,8 @@ int main(int argc, char** argv) {
 
 
   TGAImage image(100, 100, TGAImage::RGB);
+  Vec2i pts[3] = {Vec2i(10,10), Vec2i(30, 30), Vec2i(20, 60)}; 
+  triangle(pts, image, white);
 
   image.flip_vertically();
   image.write_tga_file("output.tga");
@@ -148,9 +150,22 @@ void triangle(Vec2i *pts, TGAImage &image, TGAColor color) {
     // wrapped in additional std::max to ensure vals are > 0
 
     // comparing the current point with the largest coordinate encountered so far
-    bounding_box_max.x = std::min(0, std::max(pts[i].x, bounding_box_max.x));
-    bounding_box_max.y = std::min(0, std::max(pts[i].y, bounding_box_max.y));
-    // wrapped in additional std::min to ensure vals are > 0
+    bounding_box_max.x = std::min(image.get_width() - 1, std::max(pts[i].x, bounding_box_max.x));
+    bounding_box_max.y = std::min(image.get_height() - 1, std::max(pts[i].y, bounding_box_max.y));
+    // wrapped in additional std::min to ensure vals are < image size
+  }
+
+  Vec2i P;
+  // for each vector in the bounding box; color it if it's inside the triangle too.
+  for (P.x = bounding_box_min.x; P.x <= bounding_box_max.x; P.x++) {
+    for (P.y = bounding_box_min.y; P.y <= bounding_box_max.y; P.y++) {
+      Vec3f bary_coords = barycentric(pts, P);
+      // if any of the masses are negative; the point is outside the triangle
+      if (bary_coords.x <= 0 || bary_coords.y <= 0 || bary_coords.z <= 0) continue;
+
+      image.set(P.x, P.y, color);
+    }
+
   }
 }
 
