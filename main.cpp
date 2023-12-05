@@ -26,39 +26,36 @@ void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color);
 Vec3f barycentric(Vec2i *pts, Vec2i P);
 
 int main(int argc, char** argv) {
-  //if (argc == 2) {
-  //  model = new Model(argv[1]);
-  //} else {
-  //  model = new Model("./obj/african_head.obj");
-  //}
+  if (argc == 2) {
+    model = new Model(argv[1]);
+  } else {
+    model = new Model("./obj/diablo3_pose.obj");
+  }
 
-  //model = new Model("./obj/diablo3_pose.obj");
-  //TGAImage image(width, height, TGAImage::RGB);
-  //Vec3f light_dir(0,0,-1);
+  TGAImage image(width, height, TGAImage::RGB);
+  Vec3f light_dir(0,0,-1);
 
-  //for (int i=0; i<model->nfaces(); i++) {
-  //  std::cout << "..." << std::endl;
-  //  std::vector<int> face = model->face(i);
-  //  Vec2i screen_coords[3];
-  //  Vec3f world_coords[3];
-  //  for (int j=0; j<3; j++) {
-  //    std::cout << "...." << std::endl;
-  //    Vec3f v = model->vert(face[j]);
-  //    screen_coords[j] = Vec2i((v.x+1.)*width/2., (v.y+1.)*height/2.);
-  //    world_coords[j]  = v;
-  //  }
-  //  Vec3f n = (world_coords[2]-world_coords[0])^(world_coords[1]-world_coords[0]);
-  //  n.normalize();
-  //  float intensity = n*light_dir;
-  //  if (intensity>0) {
-  //    triangle(screen_coords[0], screen_coords[1], screen_coords[2], image, TGAColor(intensity*255, intensity*255, intensity*255, 255));
-  //  }
-  //}
-
-
-  TGAImage image(100, 100, TGAImage::RGB);
-  Vec2i pts[3] = {Vec2i(10,10), Vec2i(30, 30), Vec2i(20, 60)}; 
-  triangle(pts, image, white);
+  for (int i=0; i<model->nfaces(); i++) {
+    std::vector<int> face = model->face(i);
+    Vec2i screen_coords[3];
+    Vec3f world_coords[3];
+    for (int j=0; j<3; j++) {
+      Vec3f v = model->vert(face[j]);
+      screen_coords[j] = Vec2i((v.x+1.)*width/2., (v.y+1.)*height/2.);
+      world_coords[j]  = v;
+    }
+    Vec3f n = (world_coords[2]-world_coords[0])^(world_coords[1]-world_coords[0]);
+    n.normalize();
+    float intensity = n*light_dir;
+    if (intensity>0) {
+      Vec2i pts[3] = {
+        Vec2i(screen_coords[0].x, screen_coords[0].y),
+        Vec2i(screen_coords[1].x, screen_coords[1].y),
+        Vec2i(screen_coords[2].x, screen_coords[2].y),
+      };
+      triangle(pts, image, TGAColor(intensity*255, intensity*255, intensity*255, 255));
+    }
+  }
 
   image.flip_vertically();
   image.write_tga_file("output.tga");
