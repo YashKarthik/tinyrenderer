@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstdlib>
 #include <iostream>
 #include <fstream>
 #include <cmath>
@@ -21,64 +22,51 @@ const int height = 800;
 
 Model *model = NULL;
 
-void triangle(Vec2i *pts, TGAImage &image, TGAColor color); // the new version
+void triangle(Vec3f *pts, float z_buffer[], TGAImage &image, TGAColor color);
 void triangle(Vec2i t0, Vec2i t1, Vec2i t2, TGAImage &image, TGAColor color);
 void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color);
-Vec3f barycentric(Vec2i *pts, Vec2i P);
+Vec3f barycentric(Vec3f *pts, Vec3f P);
 void rasterize(Vec2i t0, Vec2i t1, TGAImage &image, TGAColor color, int y_buffer[]);
-void rasterize(Vec3i t0, Vec3i t1, Vec3i t2, TGAImage &image, TGAColor color, int z_buffer[]);
 
 int main(int argc, char** argv) {
   if (argc == 2) {
     model = new Model(argv[1]);
   } else {
-    model = new Model("./obj/diablo3_pose.obj");
+    model = new Model("./obj/african_head.obj");
   }
 
   TGAImage image(width, height, TGAImage::RGB);
-  //Vec3f light_dir(1, 0, -1);
+  Vec3f light_dir(1, 0, -1);
 
-  //for (int i = 0; i < model->nfaces(); i++) {
-  //  std::vector<int> face = model->face(i);
-  //  Vec2i screen_coords[3];
-  //  Vec3f world_coords[3];
+  for (int i = 0; i < model->nfaces(); i++) {
+    std::vector<int> face = model->face(i);
+    Vec3f screen_coords[3];
+    Vec3f world_coords[3];
 
-  //  // projecting the 3D coordinates onto the 2D screen.
-  //  for (int j = 0; j < 3; j++) {
-  //    Vec3f v           = model->vert(face[j]);
-  //    screen_coords[j]  = Vec2i((v.x+1.)*width/2., (v.y+1.)*height/2.);
-  //    world_coords[j]   = v;
-  //  }
+    float z_buffer[width*height];
+    for (int i{0}; i < width*height; i++) {
+      z_buffer[i] = -std::numeric_limits<float>::max();
+    }
 
-  //  /* Back-face Culling
-  //   * Removes faces that are not gonna be visible in the scene. Eg: the back of the head.
-  //   * Does this by checking if the dot product of the triangle's normal and the light vector faces
-  //   * forward (positive) or backward (negative).
-  //   * */
+    // projecting the 3D coordinates onto the 2D screen.
+    for (int j = 0; j < 3; j++) {
+      Vec3f v           = model->vert(face[j]);
+      screen_coords[j]  = Vec3f((v.x+1.)*width/2. + .5, (v.y+1.)*height/2. + .5, v.z);
+      world_coords[j]   = v;
+    }
 
-  //  // Triangle's normal = side A \times side B
-  //  // Cross product is affected by order so how do we know which order to pick?
-  //  // Based on the order of vertex defs in the .obj file.
-  //  Vec3f n = (world_coords[2]-world_coords[0])^(world_coords[1]-world_coords[0]);
-  //  n.normalize();
-  //  float intensity = n*light_dir;
+    Vec3f n = (world_coords[2]-world_coords[0])^(world_coords[1]-world_coords[0]);
+    n.normalize();
+    float intensity = std::abs(n*light_dir);
 
-  //  if (intensity>0) {
-  //    Vec2i pts[3] = {
-  //      Vec2i(screen_coords[0].x, screen_coords[0].y),
-  //      Vec2i(screen_coords[1].x, screen_coords[1].y),
-  //      Vec2i(screen_coords[2].x, screen_coords[2].y),
-  //    };
+    Vec3f pts[3] = {
+      Vec3f(screen_coords[0].x, screen_coords[0].y, screen_coords[0].z),
+      Vec3f(screen_coords[1].x, screen_coords[1].y, screen_coords[1].z),
+      Vec3f(screen_coords[2].x, screen_coords[2].y, screen_coords[2].z),
+    };
 
-  //    triangle(pts, image, TGAColor(intensity*255, intensity*255, intensity*255, 255));
-  //  }
-  //}
-  int y_buffer[width*height];
-  for (int i{0}; i < width; i++) {
-    y_buffer[i] = std::numeric_limits<int>::min();
+    triangle(pts, z_buffer, image, TGAColor(intensity*255, intensity*255, intensity*255, 255));
   }
-
-  rasterize(Vec3i(20, 34, 0), Vec3i(744, 400, -1), Vec3i(50, 400, 1), image, red, y_buffer);
 
   image.flip_vertically();
   image.write_tga_file("output.tga");
@@ -131,7 +119,7 @@ void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
  * [x_3 - x  x_1 - x_3   x_2 - x_3]^T and [y_3 - y  y_1 - y_3   y_2 - y_3]^T
  * => [1 u v] =(approx) [x_3 - x  x_1 - x_3   x_2 - x_3]^T \cross [y_3 - y  y_1 - y_3   y_2 - y_3]^T
  **/
-Vec3f barycentric(Vec2i *pts, Vec2i P) {
+Vec3f barycentric(Vec3f *pts, Vec3f P) {
 
   // Since our vectors are 2D
   Vec3f cross = Vec3f(
@@ -145,7 +133,7 @@ Vec3f barycentric(Vec2i *pts, Vec2i P) {
   );
 
   // Points are colinear => zero area => return neg to signify point is outside
-  if (std::abs(cross.z) == 0) return Vec3f(-1, 1, 1);
+  if (std::abs(cross.z) <= 1e-2) return Vec3f(-1, 1, 1);
 
   // div by z to scale it down so that sum is 1
   // The third coordinate is = 1 - (u + v)
@@ -157,32 +145,51 @@ Vec3f barycentric(Vec2i *pts, Vec2i P) {
 }
 
 
-// using barycentric coordinates
-void triangle(Vec2i *pts, TGAImage &image, TGAColor color) {
-  Vec2i bounding_box_min(image.get_width() - 1, image.get_height() - 1);
-  Vec2i bounding_box_max(0, 0);
+/* 3D -> 2D rasterization
+ * Using barycentric coordinates and z-buffers
+ *
+ * Accesing z_buffer:
+ *  int idx = x + y*width;
+ *  int x = idx % width;
+ *  int y = idx / width;
+ * */
+void triangle(Vec3f *pts, float z_buffer[], TGAImage &image, TGAColor color) {
+  Vec2f bounding_box_min(std::numeric_limits<float>::max(), -std::numeric_limits<float>::max());
+  Vec2f bounding_box_max(-std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
 
   // go over each point and store the lowest, highest possible x-cord and y-cord
   for (int i{0}; i < 3; i++) {
     // comparing the current cordinate with the smallest cordinate encountered so far.
-    bounding_box_min.x = std::max(0, std::min(pts[i].x, bounding_box_min.x));
-    bounding_box_min.y = std::max(0, std::min(pts[i].y, bounding_box_min.y));
+    bounding_box_min.x = std::max(0.f, std::min(pts[i].x, bounding_box_min.x));
+    bounding_box_min.y = std::max(0.f, std::min(pts[i].y, bounding_box_min.y));
     // wrapped in additional std::max to ensure vals are > 0
 
     // comparing the current point with the largest coordinate encountered so far
-    bounding_box_max.x = std::min(image.get_width() - 1, std::max(pts[i].x, bounding_box_max.x));
-    bounding_box_max.y = std::min(image.get_height() - 1, std::max(pts[i].y, bounding_box_max.y));
+    bounding_box_max.x = std::min((float)(image.get_width() - 1), std::max(pts[i].x, bounding_box_max.x));
+    bounding_box_max.y = std::min((float)(image.get_width() - 1), std::max(pts[i].y, bounding_box_max.y));
     // wrapped in additional std::min to ensure vals are < image size
   }
 
-  Vec2i P;
-  // for each vector in the bounding box; color it if it's inside the triangle too.
+  Vec3f P;
+  /* For each vector in the bounding box
+   * Check if it's in the triangle too.
+   * Check if it's the forward-most point in the z-buffer.
+   * If both are true, then color it.
+   * */
   for (P.x = bounding_box_min.x; P.x <= bounding_box_max.x; P.x++) {
     for (P.y = bounding_box_min.y; P.y <= bounding_box_max.y; P.y++) {
       Vec3f bary_coords = barycentric(pts, P);
       // if any of the masses are negative; the point is outside the triangle
       if (bary_coords.x <= 0 || bary_coords.y <= 0 || bary_coords.z <= 0) continue;
 
+      P.z = 0;
+      P.z += pts[0].z * bary_coords.x;
+      P.z += pts[1].z * bary_coords.y;
+      P.z += pts[2].z * bary_coords.z;
+
+      if (z_buffer[int(P.x + P.y * width)] > P.z) continue;
+
+      z_buffer[int(P.x + P.y * width)] = P.z;
       image.set(P.x, P.y, color);
     }
 
@@ -230,6 +237,7 @@ void triangle(Vec2i t0, Vec2i t1, Vec2i t2, TGAImage &image, TGAColor color) {
   line(t2.x, t2.y, t1.x, t1.y, image, white);
 }
 
+// 2D -> 1D
 void rasterize(Vec2i t0, Vec2i t1, TGAImage &image, TGAColor color, int y_buffer[]) {
   if (t0.x > t1.x) std::swap(t0, t1);
 
@@ -241,32 +249,5 @@ void rasterize(Vec2i t0, Vec2i t1, TGAImage &image, TGAColor color, int y_buffer
 
     y_buffer[x] = y;
     image.set(x, 0, color);
-  }
-}
-
-void rasterize(Vec3i t0, Vec3i t1, Vec3i t2, TGAImage &image, TGAColor color, int z_buffer[]) {
-  // t2 is the forward-most
-  if (t0.z > t1.z) std::swap(t0, t1);
-  if (t0.z > t2.z) std::swap(t0, t2);
-  if (t1.z > t2.z) std::swap(t1, t2);
-
-  // loop from z-s
-  // calculate x, y for each of the sides
-  // use the 2D -> 1D rasterization func with (x0, y0) & (x1, y1)
-  float m_x = (t2.x - t0.x)/(float)(t2.z - t0.z);
-  float m_y = (t2.y - t0.y)/(float)(t2.z - t0.z);
-
-  float n_x = (t1.x - t0.x)/(float)(t1.z - t0.z);
-  float n_y = (t1.y - t0.y)/(float)(t1.z - t0.z);
-
-  int y_buffer[width];
-  for (int z{t0.z}; z < t2.z; z++) {
-    int x0 = t0.x + (z - t0.z)*m_x;
-    int x1 = t0.x + (z - t0.z)*n_x;
-
-    int y0 = t0.y + (z - t0.z)*m_y;
-    int y1 = t0.y + (z - t0.z)*n_y;
-
-    rasterize(Vec2i(x0, y0), Vec2i(x1, y1), image, color, y_buffer);
   }
 }
