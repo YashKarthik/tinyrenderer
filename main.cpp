@@ -36,19 +36,17 @@ int main(int argc, char** argv) {
   }
 
   TGAImage image(width, height, TGAImage::RGB);
-  Vec3f light_dir(1, 0, -1);
+  Vec3f light_dir(0, 0, -1);
+  float z_buffer[width*height];
+  for (int i{0}; i < width*height; i++) {
+    z_buffer[i] = -std::numeric_limits<float>::max();
+  }
 
   for (int i = 0; i < model->nfaces(); i++) {
     std::vector<int> face = model->face(i);
     Vec3f screen_coords[3];
     Vec3f world_coords[3];
 
-    float z_buffer[width*height];
-    for (int i{0}; i < width*height; i++) {
-      z_buffer[i] = -std::numeric_limits<float>::max();
-    }
-
-    // projecting the 3D coordinates onto the 2D screen.
     for (int j = 0; j < 3; j++) {
       Vec3f v           = model->vert(face[j]);
       screen_coords[j]  = Vec3f((v.x+1.)*width/2. + .5, (v.y+1.)*height/2. + .5, v.z);
@@ -60,9 +58,9 @@ int main(int argc, char** argv) {
     float intensity = std::abs(n*light_dir);
 
     Vec3f pts[3] = {
-      Vec3f(screen_coords[0].x, screen_coords[0].y, screen_coords[0].z),
-      Vec3f(screen_coords[1].x, screen_coords[1].y, screen_coords[1].z),
-      Vec3f(screen_coords[2].x, screen_coords[2].y, screen_coords[2].z),
+      Vec3f(screen_coords[0]),
+      Vec3f(screen_coords[1]),
+      Vec3f(screen_coords[2]),
     };
 
     triangle(pts, z_buffer, image, TGAColor(intensity*255, intensity*255, intensity*255, 255));
