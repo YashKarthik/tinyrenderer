@@ -231,39 +231,17 @@ void triangle(Vec2i t0, Vec2i t1, Vec2i t2, TGAImage &image, TGAColor color) {
   line(t2.x, t2.y, t1.x, t1.y, image, white);
 }
 
-void get_line_coords(int x0, int y0, int x1, int y1, int ys[]) {
-  bool steep = false;
-  if (std::abs(y1 - y0) > std::abs(x1 - x0)) {
-    std::swap(x0, y0);
-    std::swap(x1, y1);
-    steep = true;
-  }
-
-  if (x0 > x1) {
-    std::swap(x0, x1);
-    std::swap(y0, y1);
-  }
-
-  float m = (y1 - y0)/(float)(x1 - x0);
-  for (int x{x0}; x < x1; x++) {
-    int y = y0 + (x - x0)*m; // y = y0 + m*Dx
-
-    if (steep) ys[y0 - y] = x;
-    else ys[x0 - x] = y;
-  }
-}
-
 void rasterize(Vec2i t0, Vec2i t1, TGAImage &image, TGAColor color, int y_buffer[]) {
-  int ys[width];
-  for (int i{0}; i < width; i++) {
-    ys[i] = std::numeric_limits<int>::min();
-  }
-  get_line_coords(t0.x, t0.y, t1.x, t1.y, ys);
+  if (t0.x > t1.x) std::swap(t0, t1);
 
-  for (int i{0}; i < width; i++) {
-    if (y_buffer[i] > ys[i]) continue;
+  float m = (t1.y - t0.y)/(float)(t1.x - t0.x);
 
-    y_buffer[i] = ys[i];
-    image.set(t0.x + i, y_buffer[i], color);
+  for (int x{t0.x}; x < t1.x; x++) {
+    int y = t0.y + (x - t0.x)*m;
+
+    if (y_buffer[x] > y) continue;
+
+    y_buffer[x] = y;
+    image.set(x, 0, color);
   }
 }
