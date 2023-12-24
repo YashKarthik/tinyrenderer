@@ -26,6 +26,7 @@ void triangle(Vec2i t0, Vec2i t1, Vec2i t2, TGAImage &image, TGAColor color);
 void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color);
 Vec3f barycentric(Vec2i *pts, Vec2i P);
 void rasterize(Vec2i t0, Vec2i t1, TGAImage &image, TGAColor color, int y_buffer[]);
+void rasterize(Vec3i t0, Vec3i t1, Vec3i t2, TGAImage &image, TGAColor color, int z_buffer[]);
 
 int main(int argc, char** argv) {
   if (argc == 2) {
@@ -34,7 +35,7 @@ int main(int argc, char** argv) {
     model = new Model("./obj/diablo3_pose.obj");
   }
 
-  TGAImage image(width, 16, TGAImage::RGB);
+  TGAImage image(width, height, TGAImage::RGB);
   //Vec3f light_dir(1, 0, -1);
 
   //for (int i = 0; i < model->nfaces(); i++) {
@@ -72,14 +73,12 @@ int main(int argc, char** argv) {
   //    triangle(pts, image, TGAColor(intensity*255, intensity*255, intensity*255, 255));
   //  }
   //}
-  int y_buffer[width];
+  int y_buffer[width*height];
   for (int i{0}; i < width; i++) {
     y_buffer[i] = std::numeric_limits<int>::min();
   }
 
-  rasterize(Vec2i(20, 34),   Vec2i(744, 400), image, red,   y_buffer);
-  rasterize(Vec2i(120, 434), Vec2i(444, 400), image, green, y_buffer);
-  rasterize(Vec2i(330, 463), Vec2i(594, 200), image, blue,  y_buffer);
+  rasterize(Vec3i(20, 34, 0), Vec3i(744, 400, -1), Vec3i(50, 400, 1), image, red, y_buffer);
 
   image.flip_vertically();
   image.write_tga_file("output.tga");
@@ -235,13 +234,39 @@ void rasterize(Vec2i t0, Vec2i t1, TGAImage &image, TGAColor color, int y_buffer
   if (t0.x > t1.x) std::swap(t0, t1);
 
   float m = (t1.y - t0.y)/(float)(t1.x - t0.x);
-
   for (int x{t0.x}; x < t1.x; x++) {
-    int y = t0.y + (x - t0.x)*m;
 
+    int y = t0.y + (x - t0.x)*m;
     if (y_buffer[x] > y) continue;
 
     y_buffer[x] = y;
     image.set(x, 0, color);
+  }
+}
+
+void rasterize(Vec3i t0, Vec3i t1, Vec3i t2, TGAImage &image, TGAColor color, int z_buffer[]) {
+  // t2 is the forward-most
+  if (t0.z > t1.z) std::swap(t0, t1);
+  if (t0.z > t2.z) std::swap(t0, t2);
+  if (t1.z > t2.z) std::swap(t1, t2);
+
+  // loop from z-s
+  // calculate x, y for each of the sides
+  // use the 2D -> 1D rasterization func with (x0, y0) & (x1, y1)
+  float m_x = (t2.x - t0.x)/(float)(t2.z - t0.z);
+  float m_y = (t2.y - t0.y)/(float)(t2.z - t0.z);
+
+  float n_x = (t1.x - t0.x)/(float)(t1.z - t0.z);
+  float n_y = (t1.y - t0.y)/(float)(t1.z - t0.z);
+
+  int y_buffer[width];
+  for (int z{t0.z}; z < t2.z; z++) {
+    int x0 = t0.x + (z - t0.z)*m_x;
+    int x1 = t0.x + (z - t0.z)*n_x;
+
+    int y0 = t0.y + (z - t0.z)*m_y;
+    int y1 = t0.y + (z - t0.z)*n_y;
+
+    rasterize(Vec2i(x0, y0), Vec2i(x1, y1), image, color, y_buffer);
   }
 }
