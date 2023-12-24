@@ -2,6 +2,7 @@
 #include <iostream>
 #include <fstream>
 #include <cmath>
+#include <limits>
 #include <valarray>
 #include <vector>
 #include "model.h"
@@ -24,6 +25,7 @@ void triangle(Vec2i *pts, TGAImage &image, TGAColor color); // the new version
 void triangle(Vec2i t0, Vec2i t1, Vec2i t2, TGAImage &image, TGAColor color);
 void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color);
 Vec3f barycentric(Vec2i *pts, Vec2i P);
+void rasterize(Vec2i t0, Vec2i t1, TGAImage &image, TGAColor color, int y_buffer[]);
 
 int main(int argc, char** argv) {
   if (argc == 2) {
@@ -32,30 +34,52 @@ int main(int argc, char** argv) {
     model = new Model("./obj/diablo3_pose.obj");
   }
 
-  TGAImage image(width, height, TGAImage::RGB);
-  Vec3f light_dir(0,0,-1);
+  TGAImage image(width, 16, TGAImage::RGB);
+  //Vec3f light_dir(1, 0, -1);
 
-  for (int i=0; i<model->nfaces(); i++) {
-    std::vector<int> face = model->face(i);
-    Vec2i screen_coords[3];
-    Vec3f world_coords[3];
-    for (int j=0; j<3; j++) {
-      Vec3f v = model->vert(face[j]);
-      screen_coords[j] = Vec2i((v.x+1.)*width/2., (v.y+1.)*height/2.);
-      world_coords[j]  = v;
-    }
-    Vec3f n = (world_coords[2]-world_coords[0])^(world_coords[1]-world_coords[0]);
-    n.normalize();
-    float intensity = n*light_dir;
-    if (intensity>0) {
-      Vec2i pts[3] = {
-        Vec2i(screen_coords[0].x, screen_coords[0].y),
-        Vec2i(screen_coords[1].x, screen_coords[1].y),
-        Vec2i(screen_coords[2].x, screen_coords[2].y),
-      };
-      triangle(pts, image, TGAColor(intensity*255, intensity*255, intensity*255, 255));
-    }
+  //for (int i = 0; i < model->nfaces(); i++) {
+  //  std::vector<int> face = model->face(i);
+  //  Vec2i screen_coords[3];
+  //  Vec3f world_coords[3];
+
+  //  // projecting the 3D coordinates onto the 2D screen.
+  //  for (int j = 0; j < 3; j++) {
+  //    Vec3f v           = model->vert(face[j]);
+  //    screen_coords[j]  = Vec2i((v.x+1.)*width/2., (v.y+1.)*height/2.);
+  //    world_coords[j]   = v;
+  //  }
+
+  //  /* Back-face Culling
+  //   * Removes faces that are not gonna be visible in the scene. Eg: the back of the head.
+  //   * Does this by checking if the dot product of the triangle's normal and the light vector faces
+  //   * forward (positive) or backward (negative).
+  //   * */
+
+  //  // Triangle's normal = side A \times side B
+  //  // Cross product is affected by order so how do we know which order to pick?
+  //  // Based on the order of vertex defs in the .obj file.
+  //  Vec3f n = (world_coords[2]-world_coords[0])^(world_coords[1]-world_coords[0]);
+  //  n.normalize();
+  //  float intensity = n*light_dir;
+
+  //  if (intensity>0) {
+  //    Vec2i pts[3] = {
+  //      Vec2i(screen_coords[0].x, screen_coords[0].y),
+  //      Vec2i(screen_coords[1].x, screen_coords[1].y),
+  //      Vec2i(screen_coords[2].x, screen_coords[2].y),
+  //    };
+
+  //    triangle(pts, image, TGAColor(intensity*255, intensity*255, intensity*255, 255));
+  //  }
+  //}
+  int y_buffer[width];
+  for (int i{0}; i < width; i++) {
+    y_buffer[i] = std::numeric_limits<int>::min();
   }
+
+  rasterize(Vec2i(20, 34),   Vec2i(744, 400), image, red,   y_buffer);
+  rasterize(Vec2i(120, 434), Vec2i(444, 400), image, green, y_buffer);
+  rasterize(Vec2i(330, 463), Vec2i(594, 200), image, blue,  y_buffer);
 
   image.flip_vertically();
   image.write_tga_file("output.tga");
@@ -84,7 +108,6 @@ void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
     else image.set(x, y, color);
   }
 }
-
 
 /* Returns the barycentric coordinates of a point>
  * If any of the barycentric coordinates (the masses)
@@ -135,6 +158,7 @@ Vec3f barycentric(Vec2i *pts, Vec2i P) {
 }
 
 
+// using barycentric coordinates
 void triangle(Vec2i *pts, TGAImage &image, TGAColor color) {
   Vec2i bounding_box_min(image.get_width() - 1, image.get_height() - 1);
   Vec2i bounding_box_max(0, 0);
@@ -205,4 +229,41 @@ void triangle(Vec2i t0, Vec2i t1, Vec2i t2, TGAImage &image, TGAColor color) {
   line(t0.x, t0.y, t1.x, t1.y, image, white);
   line(t0.x, t0.y, t2.x, t2.y, image, white);
   line(t2.x, t2.y, t1.x, t1.y, image, white);
+}
+
+void get_line_coords(int x0, int y0, int x1, int y1, int ys[]) {
+  bool steep = false;
+  if (std::abs(y1 - y0) > std::abs(x1 - x0)) {
+    std::swap(x0, y0);
+    std::swap(x1, y1);
+    steep = true;
+  }
+
+  if (x0 > x1) {
+    std::swap(x0, x1);
+    std::swap(y0, y1);
+  }
+
+  float m = (y1 - y0)/(float)(x1 - x0);
+  for (int x{x0}; x < x1; x++) {
+    int y = y0 + (x - x0)*m; // y = y0 + m*Dx
+
+    if (steep) ys[y0 - y] = x;
+    else ys[x0 - x] = y;
+  }
+}
+
+void rasterize(Vec2i t0, Vec2i t1, TGAImage &image, TGAColor color, int y_buffer[]) {
+  int ys[width];
+  for (int i{0}; i < width; i++) {
+    ys[i] = std::numeric_limits<int>::min();
+  }
+  get_line_coords(t0.x, t0.y, t1.x, t1.y, ys);
+
+  for (int i{0}; i < width; i++) {
+    if (y_buffer[i] > ys[i]) continue;
+
+    y_buffer[i] = ys[i];
+    image.set(t0.x + i, y_buffer[i], color);
+  }
 }
