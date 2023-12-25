@@ -36,7 +36,8 @@ int main(int argc, char** argv) {
   }
 
   TGAImage image(width, height, TGAImage::RGB);
-  Vec3f light_dir(0, 0, -1);
+
+  Vec3f light_dir(0, 0, 1);
   float z_buffer[width*height];
   for (int i{0}; i < width*height; i++) {
     z_buffer[i] = -std::numeric_limits<float>::max();
@@ -55,7 +56,7 @@ int main(int argc, char** argv) {
 
     Vec3f n = (world_coords[2]-world_coords[0])^(world_coords[1]-world_coords[0]);
     n.normalize();
-    float intensity = std::abs(n*light_dir);
+    float intensity = n*light_dir;
 
     Vec3f pts[3] = {
       Vec3f(screen_coords[0]),
@@ -95,6 +96,7 @@ void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
 }
 
 /* Returns the barycentric coordinates of a point>
+ *
  * If any of the barycentric coordinates (the masses)
  * are negative, then the point P is outside the triangle.
  *
@@ -119,7 +121,6 @@ void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
  **/
 Vec3f barycentric(Vec3f *pts, Vec3f P) {
 
-  // Since our vectors are 2D
   Vec3f cross = Vec3f(
     pts[2].x - pts[0].x,
     pts[1].x - pts[0].x,
@@ -170,7 +171,7 @@ void triangle(Vec3f *pts, float z_buffer[], TGAImage &image, TGAColor color) {
 
   Vec3f P;
   /* For each vector in the bounding box
-   * Check if it's in the triangle too.
+   * Check if it's in (2d proj of) the triangle too.
    * Check if it's the forward-most point in the z-buffer.
    * If both are true, then color it.
    * */
@@ -180,6 +181,11 @@ void triangle(Vec3f *pts, float z_buffer[], TGAImage &image, TGAColor color) {
       // if any of the masses are negative; the point is outside the triangle
       if (bary_coords.x <= 0 || bary_coords.y <= 0 || bary_coords.z <= 0) continue;
 
+      /* Why is P.z = pts[i].z * bary_coords.x/y/z?
+       * Manipulating the y = mx + c representation in the rasterize function
+       * We get int y = p0.y*(1.-t) + p1.y*t; where (t, 1-t) are the barycentric coordinates of the point.
+       * So the coordinate is basially the sum of the points' z coord * bary coords.
+       * */
       P.z = 0;
       P.z += pts[0].z * bary_coords.x;
       P.z += pts[1].z * bary_coords.y;
