@@ -26,18 +26,21 @@ void triangle(Vec3f *pts, float z_buffer[], TGAImage &image, TGAColor color);
 void triangle(Vec2i t0, Vec2i t1, Vec2i t2, TGAImage &image, TGAColor color);
 void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color);
 Vec3f barycentric(Vec3f *pts, Vec3f P);
+Vec3f interpolate_texture(Vec3f *texture_pts, Vec3f P_bary);
 void rasterize(Vec2i t0, Vec2i t1, TGAImage &image, TGAColor color, int y_buffer[]);
 
 int main(int argc, char** argv) {
   if (argc == 2) {
     model = new Model(argv[1]);
   } else {
-    model = new Model("./obj/african_head.obj");
+    model = new Model("./obj/african_head/african_head.obj");
   }
 
   TGAImage image(width, height, TGAImage::RGB);
+  TGAImage texture_image = TGAImage();
+  texture_image.read_tga_file("./obj/african_head/african_head_diffuse.tga");
 
-  Vec3f light_dir(0, 0, 1);
+  Vec3f light_dir(0, 0, -1);
   float z_buffer[width*height];
   for (int i{0}; i < width*height; i++) {
     z_buffer[i] = -std::numeric_limits<float>::max();
@@ -45,26 +48,24 @@ int main(int argc, char** argv) {
 
   for (int i = 0; i < model->nfaces(); i++) {
     std::vector<int> face = model->face(i);
+
     Vec3f screen_coords[3];
     Vec3f world_coords[3];
+    Vec3f vt[3];
 
     for (int j = 0; j < 3; j++) {
       Vec3f v           = model->vert(face[j]);
       screen_coords[j]  = Vec3f((v.x+1.)*width/2. + .5, (v.y+1.)*height/2. + .5, v.z);
       world_coords[j]   = v;
+
+      vt[j] = model->texture_vert(face[j]);
     }
 
     Vec3f n = (world_coords[2]-world_coords[0])^(world_coords[1]-world_coords[0]);
     n.normalize();
     float intensity = n*light_dir;
 
-    Vec3f pts[3] = {
-      Vec3f(screen_coords[0]),
-      Vec3f(screen_coords[1]),
-      Vec3f(screen_coords[2]),
-    };
-
-    triangle(pts, z_buffer, image, TGAColor(intensity*255, intensity*255, intensity*255, 255));
+    triangle(screen_coords, z_buffer, image, TGAColor(intensity*255, intensity*255, intensity*255, 255));
   }
 
   image.flip_vertically();
@@ -200,7 +201,7 @@ void triangle(Vec3f *pts, float z_buffer[], TGAImage &image, TGAColor color) {
   }
 }
 
-void triangle(Vec2i t0, Vec2i t1, Vec2i t2, TGAImage &image, TGAColor color) { 
+void triangle(Vec2i t0, Vec2i t1, Vec2i t2, TGAImage &image, TGAColor color) {
   if (t0.y == t1.y && t0.y == t2.y) return;
 
   // t2 is the highest in room
@@ -239,6 +240,25 @@ void triangle(Vec2i t0, Vec2i t1, Vec2i t2, TGAImage &image, TGAColor color) {
   line(t0.x, t0.y, t1.x, t1.y, image, white);
   line(t0.x, t0.y, t2.x, t2.y, image, white);
   line(t2.x, t2.y, t1.x, t1.y, image, white);
+}
+
+/* Interpolates the texture coordinates for a triangle.
+ * Given the textures coordinates for the vertices of a triangle
+ * And the barycentric coordinates of a point P
+ * We calculate the texture coordinates for the point P.
+ *
+ * Assumes gives point P is inside the triangle.
+ *
+ * I think this is just the weighted average
+ * */
+Vec3f interpolate_texture(Vec3f *texture_pts, Vec3f P_bary) {
+  Vec3f interpolated_texture_coords;
+
+  for (int i{0}; i < 3; i++) {
+    interpolated_texture_coords.raw[i] = texture_pts->raw[i]*P_bary.raw[i];
+  }
+
+  return interpolated_texture_coords;
 }
 
 // 2D -> 1D
