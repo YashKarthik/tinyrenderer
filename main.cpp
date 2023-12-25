@@ -22,7 +22,7 @@ const int height = 800;
 
 Model *model = NULL;
 
-void triangle(Vec3f *pts, float z_buffer[], TGAImage &image, TGAColor color);
+void triangle(Vec3f *pts, Vec3f *texture_pts, float z_buffer[], TGAImage &image, TGAImage &texture_image, float intensity);
 void triangle(Vec2i t0, Vec2i t1, Vec2i t2, TGAImage &image, TGAColor color);
 void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color);
 Vec3f barycentric(Vec3f *pts, Vec3f P);
@@ -39,6 +39,7 @@ int main(int argc, char** argv) {
   TGAImage image(width, height, TGAImage::RGB);
   TGAImage texture_image = TGAImage();
   texture_image.read_tga_file("./obj/african_head/african_head_diffuse.tga");
+  texture_image.flip_vertically();
 
   Vec3f light_dir(0, 0, -1);
   float z_buffer[width*height];
@@ -65,7 +66,18 @@ int main(int argc, char** argv) {
     n.normalize();
     float intensity = n*light_dir;
 
-    triangle(screen_coords, z_buffer, image, TGAColor(intensity*255, intensity*255, intensity*255, 255));
+    triangle(screen_coords, vt, z_buffer, image, texture_image, intensity);
+  }
+
+  { // dump z-buffer (debugging purposes only)
+    TGAImage zbimage(width, height, TGAImage::GRAYSCALE);
+    for (int i=0; i<width; i++) {
+      for (int j=0; j<height; j++) {
+        zbimage.set(i, j, TGAColor(z_buffer[i+j*width], 1));
+      }
+    }
+    zbimage.flip_vertically(); // i want to have the origin at the left bottom corner of the image
+    zbimage.write_tga_file("zbuffer.tga");
   }
 
   image.flip_vertically();
@@ -153,7 +165,7 @@ Vec3f barycentric(Vec3f *pts, Vec3f P) {
  *  int x = idx % width;
  *  int y = idx / width;
  * */
-void triangle(Vec3f *pts, float z_buffer[], TGAImage &image, TGAColor color) {
+void triangle(Vec3f *pts, Vec3f *texture_pts, float z_buffer[], TGAImage &image, TGAImage &texture_image, float intensity) {
   Vec2f bounding_box_min(std::numeric_limits<float>::max(), -std::numeric_limits<float>::max());
   Vec2f bounding_box_max(-std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
 
@@ -193,9 +205,17 @@ void triangle(Vec3f *pts, float z_buffer[], TGAImage &image, TGAColor color) {
       P.z += pts[2].z * bary_coords.z;
 
       if (z_buffer[int(P.x + P.y * width)] > P.z) continue;
-
       z_buffer[int(P.x + P.y * width)] = P.z;
-      image.set(P.x, P.y, color);
+
+      TGAColor color = white;
+      //Vec3f texture_coord = interpolate_texture(texture_pts, P);
+
+      //TGAColor color = texture_image.get(
+      //  texture_coord.x * texture_image.get_width(),
+      //  texture_coord.y * texture_image.get_height()
+      //);
+
+      image.set(P.x, P.y, TGAColor(intensity*color.r, intensity*color.g, intensity*color.b, 255));
     }
 
   }
@@ -255,7 +275,7 @@ Vec3f interpolate_texture(Vec3f *texture_pts, Vec3f P_bary) {
   Vec3f interpolated_texture_coords;
 
   for (int i{0}; i < 3; i++) {
-    interpolated_texture_coords.raw[i] = texture_pts->raw[i]*P_bary.raw[i];
+    interpolated_texture_coords.raw[i] = P_bary.raw[i] * texture_pts[0].raw[i] + P_bary.y * texture_pts[1].raw[i] + P_bary.z * texture_pts[2].raw[i];
   }
 
   return interpolated_texture_coords;
