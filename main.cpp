@@ -221,13 +221,12 @@ void triangle(Vec3f *pts, Vec3f *texture_pts, float z_buffer[], TGAImage &image,
       if (z_buffer[int(P.x + P.y * width)] >= P.z) continue;
       z_buffer[(int)(P.x + P.y * width)] = P.z;
 
-      TGAColor color = white;
-      //Vec3f texture_coord = interpolate_texture(texture_pts, P);
+      Vec3f texture_coord = interpolate_texture(texture_pts, P);
 
-      //TGAColor color = texture_image.get(
-      //  texture_coord.x * texture_image.get_width(),
-      //  texture_coord.y * texture_image.get_height()
-      //);
+      TGAColor color = texture_image.get(
+        texture_pts[0].x * texture_image.get_width(),
+        texture_pts[0].y * texture_image.get_height()
+      );
 
       image.set(P.x, P.y, TGAColor(intensity*color.r, intensity*color.g, intensity*color.b, 255));
     }
@@ -285,15 +284,33 @@ void triangle(Vec2i t0, Vec2i t1, Vec2i t2, TGAImage &image, TGAColor color) {
  *
  * I think this is just the weighted average
  * */
-Vec3f interpolate_texture(Vec3f *texture_pts, Vec3f P_bary) {
-  Vec3f interpolated_texture_coords;
+//Vec3f interpolate_texture(Vec3f *texture_pts, Vec3f P_bary) {
+//  Vec3f interpolated_texture_coords;
+//
+//  for (int i{0}; i < 3; i++) {
+//    interpolated_texture_coords.raw[i] = P_bary.raw[i] * texture_pts[0].raw[i] + P_bary.y * texture_pts[1].raw[i] + P_bary.z * texture_pts[2].raw[i];
+//  }
+//
+//  return interpolated_texture_coords;
+//}
 
-  for (int i{0}; i < 3; i++) {
-    interpolated_texture_coords.raw[i] = P_bary.raw[i] * texture_pts[0].raw[i] + P_bary.y * texture_pts[1].raw[i] + P_bary.z * texture_pts[2].raw[i];
-  }
+Vec3f interpolate_texture(Vec3f* texture_pts, Vec3f P) {
+  Vec3f texture_coord;
+  texture_coord.x = texture_pts[0].x * P.x +
+    texture_pts[1].x * P.y +
+    texture_pts[2].x * P.z;
 
-  return interpolated_texture_coords;
+  texture_coord.y = texture_pts[0].y * P.x +
+    texture_pts[1].y * P.y +
+    texture_pts[2].y * P.z;
+
+  texture_coord.z = texture_pts[0].z * P.x +
+    texture_pts[1].z * P.y +
+    texture_pts[2].z * P.z;
+
+  return texture_coord;
 }
+
 
 // 2D -> 1D
 void rasterize(Vec2i t0, Vec2i t1, TGAImage &image, TGAColor color, int y_buffer[]) {
