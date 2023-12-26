@@ -19,6 +19,7 @@ const TGAColor black = TGAColor(0, 0, 0, 255);
 
 const int width = 800;
 const int height = 800;
+const int depth = 255;
 
 Model *model = NULL;
 
@@ -26,7 +27,7 @@ void triangle(Vec3f *pts, Vec3f *texture_pts, float z_buffer[], TGAImage &image,
 void triangle(Vec2i t0, Vec2i t1, Vec2i t2, TGAImage &image, TGAColor color);
 void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color);
 Vec3f barycentric(Vec3f *pts, Vec3f P);
-Vec3f interpolate_texture(Vec3f *texture_pts, Vec3f P_bary);
+Vec2f interpolate_texture(Vec3f *texture_pts, Vec3f P, Vec3f P_bary);
 void rasterize(Vec2i t0, Vec2i t1, TGAImage &image, TGAColor color, int y_buffer[]);
 
 int main(int argc, char** argv) {
@@ -56,19 +57,18 @@ int main(int argc, char** argv) {
 
   std::cout << "Painting triangles --- ";
   for (int i = 0; i < model->nfaces(); i++) {
-    std::vector<int> face = model->face(i);
+    std::vector<int> face_vert = model->face(i);
+    std::vector<int> face_text = model->faces_vt(i);
 
     Vec3f screen_coords[3];
     Vec3f world_coords[3];
     Vec3f vt[3];
 
     for (int j = 0; j < 3; j++) {
-      Vec3f v           = model->vert(face[j]);
-      screen_coords[j]  = Vec3f(int((v.x+1.)*width/2.+.5), int((v.y+1.)*height/2.+.5), v.z);
-
+      Vec3f v           = model->vert(face_vert[j]);
+      screen_coords[j]  = Vec3f(int((v.x+1.)*width/2.+.5), int((v.y+1.)*height/2.+.5), int((v.z+1.)*depth/2.));
       world_coords[j]   = v;
-
-      vt[j] = model->texture_vert(face[j]);
+      vt[j] = model->texture_vert(face_text[j]);
     }
 
     Vec3f n = (world_coords[2]-world_coords[0])^(world_coords[1]-world_coords[0]);
@@ -214,21 +214,27 @@ void triangle(Vec3f *pts, Vec3f *texture_pts, float z_buffer[], TGAImage &image,
        * So the coordinate is basially the sum of the points' z coord * bary coords.
        * */
       P.z = 0;
-      P.z += pts[0].z * bary_coords.x;
-      P.z += pts[1].z * bary_coords.y;
-      P.z += pts[2].z * bary_coords.z;
+      Vec2f texture_coord(0., 0.);
+      for (int i{0}; i < 3; i++) {
+        P.z += pts[i].z * bary_coords.raw[i];
+        texture_coord.x += texture_pts[i].x * bary_coords.raw[i];
+        texture_coord.y += texture_pts[i].y * bary_coords.raw[i];
+      }
 
       if (z_buffer[int(P.x + P.y * width)] >= P.z) continue;
       z_buffer[(int)(P.x + P.y * width)] = P.z;
 
-      Vec3f texture_coord = interpolate_texture(texture_pts, P);
-
       TGAColor color = texture_image.get(
-        texture_pts[0].x * texture_image.get_width(),
-        texture_pts[0].y * texture_image.get_height()
+        (int)(texture_coord.x * texture_image.get_width()),
+        (int)(texture_coord.y * texture_image.get_height())
       );
 
-      image.set(P.x, P.y, TGAColor(intensity*color.r, intensity*color.g, intensity*color.b, 255));
+      image.set(P.x, P.y, TGAColor(
+        intensity*(color.r),
+        intensity*(color.g),
+        intensity*(color.b),
+        255
+      ));
     }
 
   }
@@ -284,33 +290,27 @@ void triangle(Vec2i t0, Vec2i t1, Vec2i t2, TGAImage &image, TGAColor color) {
  *
  * I think this is just the weighted average
  * */
-//Vec3f interpolate_texture(Vec3f *texture_pts, Vec3f P_bary) {
-//  Vec3f interpolated_texture_coords;
-//
-//  for (int i{0}; i < 3; i++) {
-//    interpolated_texture_coords.raw[i] = P_bary.raw[i] * texture_pts[0].raw[i] + P_bary.y * texture_pts[1].raw[i] + P_bary.z * texture_pts[2].raw[i];
-//  }
-//
-//  return interpolated_texture_coords;
-//}
+Vec2f interpolate_texture(Vec3f *texture_pts, Vec3f P, Vec3f P_bary) {
 
-Vec3f interpolate_texture(Vec3f* texture_pts, Vec3f P) {
-  Vec3f texture_coord;
-  texture_coord.x = texture_pts[0].x * P.x +
-    texture_pts[1].x * P.y +
-    texture_pts[2].x * P.z;
+  float di[3]{};
+  for (int i{0}; i < 3; i++) {
+    di[i] = (P - texture_pts[i]).norm();
+  }
 
-  texture_coord.y = texture_pts[0].y * P.x +
-    texture_pts[1].y * P.y +
-    texture_pts[2].y * P.z;
+  float ri[3]{};
+  for (int i{0}; i < 3; i++) {
+    ri[i] = (1/di[i]) / ( (1/di[0]) + (1/di[1]) + (1/di[2]) );
+  }
 
-  texture_coord.z = texture_pts[0].z * P.x +
-    texture_pts[1].z * P.y +
-    texture_pts[2].z * P.z;
+  Vec2f texture_coords;
+  for (int i{0}; i < 2; i++) {
+    for (int j{0}; j > 3; j++) {
+      texture_coords.raw[i] += (ri[j] * texture_pts[j].x);
+    }
+  }
 
-  return texture_coord;
+  return texture_coords;
 }
-
 
 // 2D -> 1D
 void rasterize(Vec2i t0, Vec2i t1, TGAImage &image, TGAColor color, int y_buffer[]) {
