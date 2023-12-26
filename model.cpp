@@ -6,7 +6,7 @@
 #include "model.h"
 #include <iostream>
 
-Model::Model(const char *filename) : verts_(), faces_() {
+Model::Model(const char *filename) : verts(), faces_verts() {
   std::ifstream in;
   in.open (filename, std::ifstream::in);
   if (in.fail()) return;
@@ -20,56 +20,60 @@ Model::Model(const char *filename) : verts_(), faces_() {
       iss >> trash;
       Vec3f v;
       for (int i=0;i<3;i++) iss >> v.raw[i];
-      verts_.push_back(v);
+      verts.push_back(v);
 
     } else if (!line.compare(0, 2, "vt")) {
       iss >> trash >> trash; // reads "vt" into trash and jumps iss to the first texture value; we read it twice cuz trash is a char and can only hold a single char.
       Vec3f vt;
       for (int i{0}; i < 10; i++) iss >> vt.raw[i];
-      texture_verts_.push_back(vt);
+      textures.push_back(vt);
 
     } else if (!line.compare(0, 2, "f ")) {
-      std::vector<int> f;
-      std::vector<int> f_vt;
+      std::vector<int> f_verts;
+      std::vector<int> f_texts;
+      std::vector<int> f_norms;
 
-      int itrash, v_idx, vt_idx;
+      int v_idx, vt_idx, n_idx;
       iss >> trash;
-      while (iss >> v_idx >> trash >> vt_idx >> trash >> itrash) {
+      while (iss >> v_idx >> trash >> vt_idx >> trash >> n_idx) {
         v_idx--; // in wavefront obj all indices start at 1, not zero
         vt_idx--;
-        f.push_back(v_idx);
-        f_vt.push_back(vt_idx);
+        n_idx--;
+        f_verts.push_back(v_idx);
+        f_texts.push_back(vt_idx);
+        f_norms.push_back(n_idx);
       }
-      faces_.push_back(f);
-      faces_vt_.push_back(f_vt);
+      faces_verts.push_back(f_verts);
+      faces_texts.push_back(f_texts);
+      faces_norms.push_back(f_norms);
     }
   }
-  std::cerr << "# v# " << verts_.size() << " f# "  << faces_.size() << std::endl;
+  std::cerr << "# v# " << verts.size() << " f# "  << faces_verts.size() << std::endl;
 }
 
 Model::~Model() {
 }
 
 int Model::nverts() {
-  return (int)verts_.size();
+  return (int)verts.size();
 }
 
 int Model::nfaces() {
-  return (int)faces_.size();
+  return (int)faces_verts.size();
 }
 
 std::vector<int> Model::face(int idx) {
-  return faces_[idx];
+  return faces_verts[idx];
 }
 
 std::vector<int> Model::faces_vt(int idx) {
-  return faces_vt_[idx];
+  return faces_texts[idx];
 }
 
 Vec3f Model::vert(int i) {
-  return verts_[i];
+  return verts[i];
 }
 
 Vec3f Model::texture_vert(int i) {
-  return texture_verts_[i];
+  return textures[i];
 }

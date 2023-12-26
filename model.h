@@ -6,11 +6,13 @@
 
 class Model {
 private:
-	std::vector<Vec3f> verts_;
-  std::vector<Vec3f> texture_verts_;
+	std::vector<Vec3f> verts{};
+  std::vector<Vec3f> textures{};
+  std::vector<Vec3f> norms{};
 
-	std::vector<std::vector<int>> faces_;
-  std::vector<std::vector<int>> faces_vt_;
+	std::vector<std::vector<int>> faces_verts{};
+  std::vector<std::vector<int>> faces_texts{};
+  std::vector<std::vector<int>> faces_norms{};
 public:
 	Model(const char *filename);
 	~Model();

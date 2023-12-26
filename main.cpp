@@ -30,6 +30,7 @@ Vec3f interpolate_texture(Vec3f *texture_pts, Vec3f P_bary);
 void rasterize(Vec2i t0, Vec2i t1, TGAImage &image, TGAColor color, int y_buffer[]);
 
 int main(int argc, char** argv) {
+  std::cout << "Loading model." << std::endl;
   if (argc == 2) {
     model = new Model(argv[1]);
   } else {
@@ -38,7 +39,12 @@ int main(int argc, char** argv) {
 
   TGAImage image(width, height, TGAImage::RGB);
   TGAImage texture_image = TGAImage();
-  texture_image.read_tga_file("./obj/african_head/african_head_diffuse.tga");
+
+  std::cout << "Loading textures" << std::endl;;
+  if (!texture_image.read_tga_file("./obj/african_head/african_head_diffuse.tga")) {
+    std::cout << "Failed to load textures." << std::endl;
+    return 1;
+  }
   texture_image.flip_vertically();
 
   Vec3f light_dir(0, 0, -1);
@@ -46,7 +52,9 @@ int main(int argc, char** argv) {
   for (int i{0}; i < width*height; i++) {
     z_buffer[i] = -std::numeric_limits<float>::max();
   }
+  std::cout << "Initialized z-buffer." << std::endl;
 
+  std::cout << "Painting triangles --- ";
   for (int i = 0; i < model->nfaces(); i++) {
     std::vector<int> face = model->face(i);
 
@@ -56,7 +64,8 @@ int main(int argc, char** argv) {
 
     for (int j = 0; j < 3; j++) {
       Vec3f v           = model->vert(face[j]);
-      screen_coords[j]  = Vec3f((v.x+1.)*width/2. + .5, (v.y+1.)*height/2. + .5, v.z);
+      screen_coords[j]  = Vec3f(int((v.x+1.)*width/2.+.5), int((v.y+1.)*height/2.+.5), v.z);
+
       world_coords[j]   = v;
 
       vt[j] = model->texture_vert(face[j]);
@@ -68,18 +77,20 @@ int main(int argc, char** argv) {
 
     triangle(screen_coords, vt, z_buffer, image, texture_image, intensity);
   }
+  std::cout << "Done." << std::endl;
 
-  { // dump z-buffer (debugging purposes only)
-    TGAImage zbimage(width, height, TGAImage::GRAYSCALE);
-    for (int i=0; i<width; i++) {
-      for (int j=0; j<height; j++) {
-        zbimage.set(i, j, TGAColor(z_buffer[i+j*width], 1));
-      }
+  std::cout << "Dumping z-buffer." << std::endl;
+  TGAImage zb_image(width, height, TGAImage::GRAYSCALE);
+  for (int i = 0; i < width; i++) {
+    for (int j = 0; j < height; j++) {
+      zb_image.set(i, j, TGAColor(std::abs((z_buffer[i + j*width]))*255, 255));
     }
-    zbimage.flip_vertically(); // i want to have the origin at the left bottom corner of the image
-    zbimage.write_tga_file("zbuffer.tga");
   }
+  zb_image.flip_vertically(); // i want to have the origin at the left bottom corner of the image
+  zb_image.write_tga_file("zbuffer.tga");
+  std::cout << "Done." << std::endl;
 
+  std::cout << "Writing render to file." << std::endl;
   image.flip_vertically();
   image.write_tga_file("output.tga");
   delete model;
@@ -166,8 +177,11 @@ Vec3f barycentric(Vec3f *pts, Vec3f P) {
  *  int y = idx / width;
  * */
 void triangle(Vec3f *pts, Vec3f *texture_pts, float z_buffer[], TGAImage &image, TGAImage &texture_image, float intensity) {
-  Vec2f bounding_box_min(std::numeric_limits<float>::max(), -std::numeric_limits<float>::max());
-  Vec2f bounding_box_max(-std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
+  if (intensity < 0) return;
+
+  Vec2f bounding_box_min(std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
+  Vec2f bounding_box_max(-std::numeric_limits<float>::max(), -std::numeric_limits<float>::max());
+  Vec2f clamp(image.get_width()-1, image.get_height()-1);
 
   // go over each point and store the lowest, highest possible x-cord and y-cord
   for (int i{0}; i < 3; i++) {
@@ -177,8 +191,8 @@ void triangle(Vec3f *pts, Vec3f *texture_pts, float z_buffer[], TGAImage &image,
     // wrapped in additional std::max to ensure vals are > 0
 
     // comparing the current point with the largest coordinate encountered so far
-    bounding_box_max.x = std::min((float)(image.get_width() - 1), std::max(pts[i].x, bounding_box_max.x));
-    bounding_box_max.y = std::min((float)(image.get_width() - 1), std::max(pts[i].y, bounding_box_max.y));
+    bounding_box_max.x = std::min(clamp.x, std::max(pts[i].x, bounding_box_max.x));
+    bounding_box_max.y = std::min(clamp.y, std::max(pts[i].y, bounding_box_max.y));
     // wrapped in additional std::min to ensure vals are < image size
   }
 
@@ -192,7 +206,7 @@ void triangle(Vec3f *pts, Vec3f *texture_pts, float z_buffer[], TGAImage &image,
     for (P.y = bounding_box_min.y; P.y <= bounding_box_max.y; P.y++) {
       Vec3f bary_coords = barycentric(pts, P);
       // if any of the masses are negative; the point is outside the triangle
-      if (bary_coords.x <= 0 || bary_coords.y <= 0 || bary_coords.z <= 0) continue;
+      if (bary_coords.x < 0 || bary_coords.y < 0 || bary_coords.z < 0) continue;
 
       /* Why is P.z = pts[i].z * bary_coords.x/y/z?
        * Manipulating the y = mx + c representation in the rasterize function
@@ -204,8 +218,8 @@ void triangle(Vec3f *pts, Vec3f *texture_pts, float z_buffer[], TGAImage &image,
       P.z += pts[1].z * bary_coords.y;
       P.z += pts[2].z * bary_coords.z;
 
-      if (z_buffer[int(P.x + P.y * width)] > P.z) continue;
-      z_buffer[int(P.x + P.y * width)] = P.z;
+      if (z_buffer[int(P.x + P.y * width)] >= P.z) continue;
+      z_buffer[(int)(P.x + P.y * width)] = P.z;
 
       TGAColor color = white;
       //Vec3f texture_coord = interpolate_texture(texture_pts, P);
