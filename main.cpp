@@ -23,29 +23,17 @@ const int depth = 255;
 
 Model *model = NULL;
 
-void triangle(Vec3f *pts, Vec3f *texture_pts, float z_buffer[], TGAImage &image, TGAImage &texture_image, float intensity);
-void triangle(Vec2i t0, Vec2i t1, Vec2i t2, TGAImage &image, TGAColor color);
-void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color);
+void triangle(Vec3f *pts, Vec3f *texture_pts, float z_buffer[], TGAImage &image, float intensity);
 Vec3f barycentric(Vec3f *pts, Vec3f P);
-Vec2f interpolate_texture(Vec3f *texture_pts, Vec3f P, Vec3f P_bary);
-void rasterize(Vec2i t0, Vec2i t1, TGAImage &image, TGAColor color, int y_buffer[]);
 
 int main(int argc, char** argv) {
-  TGAImage image(width, height, TGAImage::RGB);
-  TGAImage texture_image = TGAImage();
+  TGAImage render_image(width, height, TGAImage::RGB);
 
   std::cout << "Loading model." << std::endl;
-  if (argc == 2) {
-    model = new Model(argv[1]);
+  if (argc == 3) {
+    model = new Model(argv[1], argv[2]);
   } else {
-    model = new Model("./obj/african_head/african_head.obj");
-
-    std::cout << "Loading textures" << std::endl;;
-    if (!texture_image.read_tga_file("./obj/african_head/african_head_diffuse.tga")) {
-      std::cout << "Failed to load textures." << std::endl;
-      return 1;
-    }
-    texture_image.flip_vertically();
+    model = new Model("./obj/african_head/african_head.obj", "./obj/african_head/african_head_diffuse.tga");
   }
 
   Vec3f light_dir(0, 0, -1);
@@ -75,7 +63,7 @@ int main(int argc, char** argv) {
     n.normalize();
     float intensity = n*light_dir;
 
-    triangle(screen_coords, vt, z_buffer, image, texture_image, intensity);
+    triangle(screen_coords, vt, z_buffer, render_image, intensity);
   }
   std::cout << "Done." << std::endl;
 
@@ -91,8 +79,8 @@ int main(int argc, char** argv) {
   std::cout << "Done." << std::endl;
 
   std::cout << "Writing render to file." << std::endl;
-  image.flip_vertically();
-  image.write_tga_file("output.tga");
+  render_image.flip_vertically();
+  render_image.write_tga_file("output.tga");
   delete model;
   return 0;
 }
@@ -154,7 +142,7 @@ Vec3f barycentric(Vec3f *pts, Vec3f P) {
  *  int x = idx % width;
  *  int y = idx / width;
  * */
-void triangle(Vec3f *pts, Vec3f *texture_pts, float z_buffer[], TGAImage &image, TGAImage &texture_image, float intensity) {
+void triangle(Vec3f *pts, Vec3f *texture_pts, float z_buffer[], TGAImage &image, float intensity) {
   if (intensity < 0) return;
 
   Vec2f bounding_box_min(std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
@@ -202,10 +190,7 @@ void triangle(Vec3f *pts, Vec3f *texture_pts, float z_buffer[], TGAImage &image,
       if (z_buffer[int(P.x + P.y * width)] >= P.z) continue;
       z_buffer[(int)(P.x + P.y * width)] = P.z;
 
-      TGAColor color = texture_image.get(
-        (int)(texture_coord.x * texture_image.get_width()),
-        (int)(texture_coord.y * texture_image.get_height())
-      );
+      TGAColor color = model->diffuse(texture_coord);
 
       image.set(P.x, P.y, TGAColor(
         intensity*(color.r),

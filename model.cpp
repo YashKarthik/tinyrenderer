@@ -6,9 +6,9 @@
 #include "model.h"
 #include <iostream>
 
-Model::Model(const char *filename) : verts(), faces_verts() {
+Model::Model(const char *obj_file, const char *texts_file) : verts(), faces_verts() {
   std::ifstream in;
-  in.open (filename, std::ifstream::in);
+  in.open (obj_file, std::ifstream::in);
   if (in.fail()) return;
   std::string line;
   while (!in.eof()) {
@@ -48,6 +48,7 @@ Model::Model(const char *filename) : verts(), faces_verts() {
       faces_norms.push_back(f_norms);
     }
   }
+  load_textures(texts_file, diffuse_map);
   std::cerr << "# v# " << verts.size() << " f# "  << faces_verts.size() << std::endl;
 }
 
@@ -76,4 +77,16 @@ Vec3f Model::vert(int i) {
 
 Vec3f Model::texture_vert(int i) {
   return textures[i];
+}
+
+TGAColor Model::diffuse(Vec2f texture_coords) {
+  return diffuse_map.get(
+    texture_coords.x * diffuse_map.get_width(),
+    texture_coords.y * diffuse_map.get_height()
+  );
+}
+
+void Model::load_textures(const char* texts_file, TGAImage &img) {
+  std::cerr << "Texture file " << texts_file << " loading " << (img.read_tga_file(texts_file) ? "Done." : "failed") << std::endl;
+  img.flip_vertically();
 }
