@@ -20,14 +20,45 @@ const TGAColor black = TGAColor(0, 0, 0, 255);
 const int width = 800;
 const int height = 800;
 const int depth = 255;
-
+Vec3f light_dir(0, 0, -1);
+Vec3f camera(0, 0, 3);
 Model *model = NULL;
 
 void triangle(Vec3f *pts, Vec3f *texture_pts, float z_buffer[], TGAImage &image, float intensity);
 Vec3f barycentric(Vec3f *pts, Vec3f P);
 
+// cartesian to homogeneous coordinates
+Vec3f m2v(Matrix m) {
+  return Vec3f(
+    m[0][0]/m[3][0],
+    m[1][0]/m[3][0],
+    m[2][0]/m[3][0]
+  );
+}
+
+// homogeneous to cartesian coordinates
+Matrix v2m(Vec3f v) {
+  Matrix m(4, 1);
+  m[0][0] = v.x;
+  m[1][0] = v.y;
+  m[2][0] = v.z;
+  m[3][0] = 1.f;
+  return m;
+}
+
+Matrix viewport(int x, int y, int w, int h) {
+  Matrix m = Matrix::identity(4);
+  m[0][3] = x+w/2.f;
+  m[1][3] = y+h/2.f;
+  m[2][3] = depth/2.f;
+
+  m[0][0] = w/2.f;
+  m[1][1] = h/2.f;
+  m[2][2] = depth/2.f;
+  return m;
+}
+
 int main(int argc, char** argv) {
-  TGAImage render_image(width, height, TGAImage::RGB);
 
   std::cout << "Loading model." << std::endl;
   if (argc == 3) {
@@ -36,12 +67,16 @@ int main(int argc, char** argv) {
     model = new Model("./obj/african_head/african_head.obj", "./obj/african_head/african_head_diffuse.tga");
   }
 
-  Vec3f light_dir(0, 0, -1);
   float z_buffer[width*height];
   for (int i{0}; i < width*height; i++) {
     z_buffer[i] = -std::numeric_limits<float>::max();
   }
   std::cout << "Initialized z-buffer." << std::endl;
+
+  TGAImage render_image(width, height, TGAImage::RGB);
+  Matrix Projection = Matrix::identity(4);
+  Matrix Viewport = viewport(width/8, height/8, width*3/4, height*3/4);
+  Projection[3][2] = -1.f/camera.z;
 
   std::cout << "Painting triangles --- ";
   for (int i = 0; i < model->nfaces(); i++) {
@@ -54,7 +89,10 @@ int main(int argc, char** argv) {
 
     for (int j = 0; j < 3; j++) {
       Vec3f v           = model->vert(face_vert[j]);
-      screen_coords[j]  = Vec3f(int((v.x+1.)*width/2.+.5), int((v.y+1.)*height/2.+.5), int((v.z+1.)*depth/2.));
+
+      Vec3f temp        =  m2v(Viewport * Projection * v2m(v));
+      screen_coords[j]  = Vec3f(int(temp.x), int(temp.y), int(temp.z));
+
       world_coords[j]   = v;
       vt[j] = model->texture_vert(face_text[j]);
     }
@@ -132,7 +170,6 @@ Vec3f barycentric(Vec3f *pts, Vec3f P) {
     cross.x/cross.z
   );
 }
-
 
 /* 3D -> 2D rasterization
  * Using barycentric coordinates and z-buffers
