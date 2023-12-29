@@ -20,8 +20,9 @@ const TGAColor black = TGAColor(0, 0, 0, 255);
 const int width = 800;
 const int height = 800;
 const int depth = 255;
-Vec3f light_dir(0, 0, -1);
-Vec3f camera(0, 0, 3);
+Vec3f light_dir = Vec3f(1, -1, 1).normalize();
+Vec3f eye(3,3,3);
+Vec3f center(0, 0, 0);
 Model *model = NULL;
 
 void triangle(Vec3f *pts, Vec3f *texture_pts, float z_buffer[], TGAImage &image, float intensity);
@@ -62,11 +63,12 @@ Matrix ModelMatrix = Matrix::identity(4);
  *
  * M^-1 = [x' y' z']( [x y z] - [cx cy cz] )^1
  * M^-1 = -[x' y' z'][cx cy cz]^-1
+ * M_inv "undos" the rotation. So where the current basis vectors would land in a regular (i,j,k)
+ * system.
  *
  **/
-
 Matrix lookat(Vec3f eye, Vec3f center, Vec3f up) {
-  Vec3f O_z = (center - eye).normalize();
+  Vec3f O_z = (eye - center).normalize();
   Vec3f O_x = (up ^ O_z).normalize(); // cross product
   Vec3f O_y = (O_z ^ O_x).normalize();
   
@@ -78,7 +80,7 @@ Matrix lookat(Vec3f eye, Vec3f center, Vec3f up) {
     M_inv[1][i] = O_y.raw[i];
     M_inv[2][i] = O_z.raw[i];
 
-    Tr[i][0] = -center.raw[i];
+    Tr[i][3] = -center.raw[i];
   }
 
   return M_inv * Tr;
@@ -112,10 +114,13 @@ int main(int argc, char** argv) {
   }
   std::cout << "Initialized z-buffer." << std::endl;
 
-  TGAImage render_image(width, height, TGAImage::RGB);
   Matrix Projection = Matrix::identity(4);
   Matrix Viewport = viewport(width/8, height/8, width*3/4, height*3/4);
-  Projection[3][2] = -1.f/camera.z;
+  Matrix View = lookat(eye, center, Vec3f(0, 1, 0));
+
+  Projection[3][2] = -1.f/(eye - center).norm();
+
+  TGAImage render_image(width, height, TGAImage::RGB);
 
   std::cout << "Painting triangles --- ";
   for (int i = 0; i < model->nfaces(); i++) {
@@ -129,7 +134,7 @@ int main(int argc, char** argv) {
     for (int j = 0; j < 3; j++) {
       Vec3f v           = model->vert(face_vert[j]);
 
-      Vec3f temp        =  m2v(Viewport * Projection * ModelMatrix * v2m(v));
+      Vec3f temp        =  m2v(Viewport * Projection * View * ModelMatrix * v2m(v));
       screen_coords[j]  = Vec3f(int(temp.x), int(temp.y), int(temp.z));
 
       world_coords[j]   = v;
@@ -140,7 +145,7 @@ int main(int argc, char** argv) {
     n.normalize();
     float intensity = n*light_dir;
 
-    triangle(screen_coords, vt, z_buffer, render_image, intensity);
+    triangle(screen_coords, vt, z_buffer, render_image, 255);
   }
   std::cout << "Done." << std::endl;
 
