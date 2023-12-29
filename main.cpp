@@ -28,25 +28,6 @@ Model *model = NULL;
 void triangle(Vec3f *pts, Vec3f *texture_pts, Vec3f *vertex_normals, float z_buffer[], TGAImage &image);
 Vec3f barycentric(Vec3f *pts, Vec3f P);
 
-// cartesian to homogeneous coordinates
-Vec3f m2v(Matrix m) {
-  return Vec3f(
-    m[0][0]/m[3][0],
-    m[1][0]/m[3][0],
-    m[2][0]/m[3][0]
-  );
-}
-
-// homogeneous to cartesian coordinates
-Matrix v2m(Vec3f v) {
-  Matrix m(4, 1);
-  m[0][0] = v.x;
-  m[1][0] = v.y;
-  m[2][0] = v.z;
-  m[3][0] = 1.f;
-  return m;
-}
-
 // Model matrix expresses objects in world coordinates
 // object (local) coords -> world
 Matrix ModelMatrix = Matrix::identity(4);
@@ -139,7 +120,7 @@ int main(int argc, char** argv) {
       vt[j]    = model->texture_vert(face_text[j]);
       vn[j]    = model->vert_norm(0);
 
-      Vec3f temp        =  m2v(Viewport * Projection * View * ModelMatrix * v2m(v));
+      Vec3f temp        =  (Viewport * Projection * View * ModelMatrix * Matrix(v)).to_vector();
       screen_coords[j]  = Vec3f(int(temp.x), int(temp.y), int(temp.z));
 
       world_coords[j]   = v;
