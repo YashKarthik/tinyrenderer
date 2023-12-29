@@ -28,6 +28,12 @@ Model::Model(const char *obj_file, const char *texts_file) : verts(), faces_vert
       for (int i{0}; i < 10; i++) iss >> vt.raw[i];
       textures.push_back(vt);
 
+    } else if (!line.compare(0, 2, "vn")) {
+      iss >> trash >> trash;
+      Vec3f vn;
+      for (int i{0}; i < 10; i++) iss >> vn.raw[i];
+      norms.push_back(vn);
+
     } else if (!line.compare(0, 2, "f ")) {
       std::vector<int> f_verts;
       std::vector<int> f_texts;
@@ -63,12 +69,16 @@ int Model::nfaces() {
   return (int)faces_verts.size();
 }
 
-std::vector<int> Model::face(int idx) {
+std::vector<int> Model::face_verts(int idx) {
   return faces_verts[idx];
 }
 
-std::vector<int> Model::faces_vt(int idx) {
+std::vector<int> Model::face_texts(int idx) {
   return faces_texts[idx];
+}
+
+std::vector<int> Model::face_norms(int idx) {
+  return faces_norms[idx];
 }
 
 Vec3f Model::vert(int i) {
@@ -77,6 +87,10 @@ Vec3f Model::vert(int i) {
 
 Vec3f Model::texture_vert(int i) {
   return textures[i];
+}
+
+Vec3f Model::vert_norm(int i) {
+  return norms[i].normalize();
 }
 
 TGAColor Model::diffuse(Vec2f texture_coords) {

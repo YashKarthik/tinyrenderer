@@ -20,12 +20,12 @@ const TGAColor black = TGAColor(0, 0, 0, 255);
 const int width = 800;
 const int height = 800;
 const int depth = 255;
-Vec3f light_dir = Vec3f(1, -1, 1).normalize();
-Vec3f eye(3,3,3);
+Vec3f light_dir = Vec3f(1, 1, -1).normalize();
+Vec3f eye(1, 1, 3);
 Vec3f center(0, 0, 0);
 Model *model = NULL;
 
-void triangle(Vec3f *pts, Vec3f *texture_pts, float z_buffer[], TGAImage &image, float intensity);
+void triangle(Vec3f *pts, Vec3f *texture_pts, Vec3f *vertex_normals, float z_buffer[], TGAImage &image);
 Vec3f barycentric(Vec3f *pts, Vec3f P);
 
 // cartesian to homogeneous coordinates
@@ -106,6 +106,7 @@ int main(int argc, char** argv) {
     model = new Model(argv[1], argv[2]);
   } else {
     model = new Model("./obj/african_head/african_head.obj", "./obj/african_head/african_head_diffuse.tga");
+    //model = new Model("./obj/diablo3_pose/diablo3_pose.obj", "./obj/diablo3_pose/diablo3_pose_diffuse.tga");
   }
 
   float z_buffer[width*height];
@@ -124,28 +125,30 @@ int main(int argc, char** argv) {
 
   std::cout << "Painting triangles --- ";
   for (int i = 0; i < model->nfaces(); i++) {
-    std::vector<int> face_vert = model->face(i);
-    std::vector<int> face_text = model->faces_vt(i);
+    std::vector<int> face_vert  = model->face_verts(i);
+    std::vector<int> face_text  = model->face_texts(i);
+    std::vector<int> face_norms = model->face_norms(i);
 
     Vec3f screen_coords[3];
     Vec3f world_coords[3];
     Vec3f vt[3];
+    Vec3f vn[3];
 
     for (int j = 0; j < 3; j++) {
-      Vec3f v           = model->vert(face_vert[j]);
+      Vec3f v  = model->vert(face_vert[j]);
+      vt[j]    = model->texture_vert(face_text[j]);
+      vn[j]    = model->vert_norm(0);
 
       Vec3f temp        =  m2v(Viewport * Projection * View * ModelMatrix * v2m(v));
       screen_coords[j]  = Vec3f(int(temp.x), int(temp.y), int(temp.z));
 
       world_coords[j]   = v;
-      vt[j] = model->texture_vert(face_text[j]);
     }
 
-    Vec3f n = (world_coords[2]-world_coords[0])^(world_coords[1]-world_coords[0]);
-    n.normalize();
-    float intensity = n*light_dir;
+    //Vec3f n = ((world_coords[2]-world_coords[0])^(world_coords[1]-world_coords[0])).normalize();
+    //float intensity = n*light_dir;
 
-    triangle(screen_coords, vt, z_buffer, render_image, 255);
+    triangle(screen_coords, vt, vn, z_buffer, render_image);
   }
   std::cout << "Done." << std::endl;
 
@@ -223,8 +226,7 @@ Vec3f barycentric(Vec3f *pts, Vec3f P) {
  *  int x = idx % width;
  *  int y = idx / width;
  * */
-void triangle(Vec3f *pts, Vec3f *texture_pts, float z_buffer[], TGAImage &image, float intensity) {
-  if (intensity < 0) return;
+void triangle(Vec3f *pts, Vec3f *texture_pts, Vec3f *vertex_normals, float z_buffer[], TGAImage &image) {
 
   Vec2f bounding_box_min(std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
   Vec2f bounding_box_max(-std::numeric_limits<float>::max(), -std::numeric_limits<float>::max());
@@ -244,6 +246,7 @@ void triangle(Vec3f *pts, Vec3f *texture_pts, float z_buffer[], TGAImage &image,
   }
 
   Vec3f P;
+  Vec3f n;
   /* For each vector in the bounding box
    * Check if it's in (2d proj of) the triangle too.
    * Check if it's the forward-most point in the z-buffer.
@@ -263,9 +266,17 @@ void triangle(Vec3f *pts, Vec3f *texture_pts, float z_buffer[], TGAImage &image,
       Vec2f texture_coord(0., 0.);
       for (int i{0}; i < 3; i++) {
         P.z += pts[i].z * bary_coords.raw[i];
+
         texture_coord.x += texture_pts[i].x * bary_coords.raw[i];
         texture_coord.y += texture_pts[i].y * bary_coords.raw[i];
+
+        n.x += vertex_normals[i].x * bary_coords.raw[i];
+        n.y += vertex_normals[i].y * bary_coords.raw[i];
+        n.z += vertex_normals[i].z * bary_coords.raw[i];
       }
+
+      float intensity = n*light_dir;
+      //if (intensity < 0) return;
 
       if (z_buffer[int(P.x + P.y * width)] >= P.z) continue;
       z_buffer[(int)(P.x + P.y * width)] = P.z;
@@ -273,9 +284,9 @@ void triangle(Vec3f *pts, Vec3f *texture_pts, float z_buffer[], TGAImage &image,
       TGAColor color = model->diffuse(texture_coord);
 
       image.set(P.x, P.y, TGAColor(
-        intensity*(color.r),
-        intensity*(color.g),
-        intensity*(color.b),
+        (color.r),
+        (color.g),
+        (color.b),
         255
       ));
     }

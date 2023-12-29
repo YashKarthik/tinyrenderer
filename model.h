@@ -22,10 +22,15 @@ public:
 	~Model();
 	int nverts();
 	int nfaces();
+
 	Vec3f vert(int i);
   Vec3f texture_vert(int i);
-	std::vector<int> face(int idx);
-	std::vector<int> faces_vt(int idx);
+  Vec3f vert_norm(int i);
+
+	std::vector<int> face_verts(int idx);
+	std::vector<int> face_texts(int idx);
+	std::vector<int> face_norms(int idx);
+
   TGAColor diffuse(Vec2f texture_coords);
 };
 
