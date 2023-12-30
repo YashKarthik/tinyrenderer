@@ -4,8 +4,6 @@
 #include <cmath>
 #include <iostream>
 
-class Matrix;
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template <class t> struct Vec2 {
@@ -76,13 +74,7 @@ public:
   Matrix inverse();
 
   // homogeneous to cartesian coordinates
-  Vec3f to_vector() {
-    return Vec3f(
-      m[0][0]/m[3][0],
-      m[1][0]/m[3][0],
-      m[2][0]/m[3][0]
-    );
-  }
+  Vec3f to_Vec3f();
 
   friend std::ostream& operator<<(std::ostream& s, Matrix& m);
 };

@@ -81,16 +81,16 @@ std::vector<int> Model::face_norms(int idx) {
   return faces_norms[idx];
 }
 
-Vec3f Model::vert(int i) {
-  return verts[i];
+Vec3f Model::vert(int iface, int nthvert) {
+  return verts[ face_verts(iface)[nthvert] ];
 }
 
-Vec3f Model::texture_vert(int i) {
-  return textures[i];
+Vec3f Model::texture_vert(int iface, int nthvert) {
+  return norms[ face_texts(iface)[nthvert] ];
 }
 
-Vec3f Model::vert_norm(int i) {
-  return norms[i].normalize();
+Vec3f Model::vert_norm(int iface, int nthvert) {
+  return norms[ face_norms(iface)[nthvert] ].normalize();
 }
 
 TGAColor Model::diffuse(Vec2f texture_coords) {
@@ -101,6 +101,6 @@ TGAColor Model::diffuse(Vec2f texture_coords) {
 }
 
 void Model::load_textures(const char* texts_file, TGAImage &img) {
-  std::cerr << "Texture file " << texts_file << " loading " << (img.read_tga_file(texts_file) ? "Done." : "failed") << std::endl;
+  std::cerr << "Texture file " << texts_file << " loading " << (img.read_tga_file(texts_file) ? "Loaded textures." : "failed") << std::endl;
   img.flip_vertically();
 }

@@ -1,15 +1,11 @@
+#include "gl.h"
 #include "geometry.h"
 #include "model.h"
 #include "tgaimage.h"
 
-// remove these consts before compiling
-const int width = 800;
-const int height = 800;
-const int depth = 255;
-Vec3f light_dir = Vec3f(1, 1, -1).normalize();
-Vec3f eye(1, 1, 3);
-Vec3f center(0, 0, 0);
-Model *model = NULL;
+Matrix ModelView;
+Matrix Viewport;
+Matrix Projection;
 
 
 /* Returns the Model*View matrix which tranforms
@@ -30,7 +26,7 @@ Model *model = NULL;
  * system.
  *
  **/
-Matrix lookat(Vec3f eye, Vec3f center, Vec3f up) {
+void lookat(Vec3f eye, Vec3f center, Vec3f up) {
   Vec3f O_z = (eye - center).normalize();
   Vec3f O_x = (up ^ O_z).normalize(); // cross product
   Vec3f O_y = (O_z ^ O_x).normalize();
@@ -46,20 +42,24 @@ Matrix lookat(Vec3f eye, Vec3f center, Vec3f up) {
     Tr[i][3] = -center.raw[i];
   }
 
-  return M_inv * Tr;
+  Matrix ModelView = M_inv * Tr;
 }
 
 // Matrix to map points in [-1,1] to image of [w, h]
-Matrix viewport(int x, int y, int w, int h) {
-  Matrix m = Matrix::identity(4);
-  m[0][3] = x+w/2.f;
-  m[1][3] = y+h/2.f;
-  m[2][3] = depth/2.f;
+void viewport(int x, int y, int w, int h) {
+  Matrix Viewport = Matrix::identity(4);
+  Viewport[0][3] = x+w/2.f;
+  Viewport[1][3] = y+h/2.f;
+  Viewport[2][3] = depth/2.f;
 
-  m[0][0] = w/2.f;
-  m[1][1] = h/2.f;
-  m[2][2] = depth/2.f;
-  return m;
+  Viewport[0][0] = w/2.f;
+  Viewport[1][1] = h/2.f;
+  Viewport[2][2] = depth/2.f;
+}
+
+void projection(float coeff) {
+  Matrix Projection = Matrix::identity(4);
+  Projection[3][2] = coeff;
 }
 
 /* Returns the barycentric coordinates of a point>
@@ -118,7 +118,7 @@ Vec3f barycentric(Vec3f *pts, Vec3f P) {
  *  int x = idx % width;
  *  int y = idx / width;
  * */
-void triangle(Vec3f *pts, Vec3f *texture_pts, Vec3f *vertex_normals, float z_buffer[], TGAImage &image) {
+void triangle(Vec3f *pts, IShader &shader, TGAImage &image, float z_buffer[]) {
 
   Vec2f bounding_box_min(std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
   Vec2f bounding_box_max(-std::numeric_limits<float>::max(), -std::numeric_limits<float>::max());
@@ -138,7 +138,6 @@ void triangle(Vec3f *pts, Vec3f *texture_pts, Vec3f *vertex_normals, float z_buf
   }
 
   Vec3f P;
-  Vec3f n;
   /* For each vector in the bounding box
    * Check if it's in (2d proj of) the triangle too.
    * Check if it's the forward-most point in the z-buffer.
@@ -155,32 +154,18 @@ void triangle(Vec3f *pts, Vec3f *texture_pts, Vec3f *vertex_normals, float z_buf
        * Weighted avg of the cartesian coordiantes of the corners! (for each component)
        **/
       P.z = 0;
-      Vec2f texture_coord(0., 0.);
       for (int i{0}; i < 3; i++) {
         P.z += pts[i].z * bary_coords.raw[i];
-
-        texture_coord.x += texture_pts[i].x * bary_coords.raw[i];
-        texture_coord.y += texture_pts[i].y * bary_coords.raw[i];
-
-        n.x += vertex_normals[i].x * bary_coords.raw[i];
-        n.y += vertex_normals[i].y * bary_coords.raw[i];
-        n.z += vertex_normals[i].z * bary_coords.raw[i];
       }
-
-      float intensity = n*light_dir;
-      //if (intensity < 0) return;
 
       if (z_buffer[int(P.x + P.y * width)] >= P.z) continue;
       z_buffer[(int)(P.x + P.y * width)] = P.z;
 
-      TGAColor color = model->diffuse(texture_coord);
+      TGAColor color;
+      bool discard = shader.fragment(bary_coords, color);
+      if (discard) continue;
 
-      image.set(P.x, P.y, TGAColor(
-        (color.r),
-        (color.g),
-        (color.b),
-        255
-      ));
+      image.set(P.x, P.y, color);
     }
 
   }

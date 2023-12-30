@@ -11,13 +11,6 @@
 #include "tgaimage.h"
 #include "gl.h"
 
-const TGAColor white = TGAColor(255, 255, 255, 255);
-const TGAColor red = TGAColor(255, 0, 0, 255);
-const TGAColor green = TGAColor(0, 255, 0, 255);
-const TGAColor blue = TGAColor(37, 164, 249, 1);
-const TGAColor yellow = TGAColor(253, 190, 0, 255);
-const TGAColor black = TGAColor(0, 0, 0, 255);
-
 const int width = 800;
 const int height = 800;
 const int depth = 255;
@@ -25,6 +18,32 @@ Vec3f light_dir = Vec3f(1, 1, -1).normalize();
 Vec3f eye(1, 1, 3);
 Vec3f center(0, 0, 0);
 Model *model = NULL;
+
+struct GouraudShader : public IShader {
+  Vec3f varying_intensity;
+
+  /* Responsibilities:
+  *   1. Reads (face, vertex) data from file.
+  *   2. Calculates intensity at vertices.
+  *   3. Transfroms scene's face into screen coordinates.
+  **/
+  virtual Vec3f vertex(int iface, int nthvert) {
+    varying_intensity.raw[nthvert] = std::max(0.f, model->vert_norm(iface, nthvert)*light_dir);
+    Matrix gl_Vertex = Matrix(model->vert(iface, nthvert));
+
+    return (Viewport*Projection*ModelView*gl_Vertex).to_Vec3f();
+  }
+
+  /* Responsibilities:
+   *  1. Interpolates intensity values at current pixel.
+   *  2. Returns calculated color.
+   * */
+  virtual bool fragment(Vec3f bar, TGAColor &color) {
+    float intensity = varying_intensity*bar;
+    color = TGAColor(255*intensity, 255*intensity, 255*intensity, 255);
+    return false;
+  }
+};
 
 
 int main() {
@@ -37,40 +56,25 @@ int main() {
     z_buffer[i] = -std::numeric_limits<float>::max();
   }
 
-  Matrix Projection = Matrix::identity(4);
-  Matrix Viewport = viewport(width/8, height/8, width*3/4, height*3/4);
-  Matrix ModelView = lookat(eye, center, Vec3f(0, 1, 0));
+  projection(-1.f/(eye - center).norm());
+  viewport(width/8, height/8, width*3/4, height*3/4);
+  lookat(eye, center, Vec3f(0, 1, 0));
 
-  Projection[3][2] = -1.f/(eye - center).norm();
-
-  TGAImage render_image(width, height, TGAImage::RGB);
+  TGAImage rendered_image(width, height, TGAImage::RGB);
+  GouraudShader shader;
 
   for (int i = 0; i < model->nfaces(); i++) {
-    std::vector<int> face_vert  = model->face_verts(i);
-    std::vector<int> face_text  = model->face_texts(i);
-    std::vector<int> face_norms = model->face_norms(i);
-
     Vec3f screen_coords[3];
-    Vec3f world_coords[3];
-    Vec3f vt[3];
-    Vec3f vn[3];
 
-    for (int j = 0; j < 3; j++) {
-      Vec3f v  = model->vert(face_vert[j]);
-      vt[j]    = model->texture_vert(face_text[j]);
-      vn[j]    = model->vert_norm(0);
-
-      Vec3f temp        =  (Viewport * Projection * ModelView * Matrix(v)).to_vector();
-      screen_coords[j]  = Vec3f(int(temp.x), int(temp.y), int(temp.z));
-
-      world_coords[j]   = v;
+    for (int j{0}; j < 3; j++) {
+      screen_coords[j] = shader.vertex(i, j);
     }
 
-    triangle(screen_coords, vt, vn, z_buffer, render_image);
+    triangle(screen_coords, shader, rendered_image, z_buffer);
   }
 
-  render_image.flip_vertically();
-  render_image.write_tga_file("output.tga");
+  rendered_image.flip_vertically();
+  rendered_image.write_tga_file("output.tga");
   delete model;
   return 0;
 }

@@ -23,9 +23,9 @@ public:
 	int nverts();
 	int nfaces();
 
-	Vec3f vert(int i);
-  Vec3f texture_vert(int i);
-  Vec3f vert_norm(int i);
+  Vec3f vert(int iface, int nthvert);
+  Vec3f texture_vert(int iface, int nthvert);
+  Vec3f vert_norm(int iface, int nthvert);
 
 	std::vector<int> face_verts(int idx);
 	std::vector<int> face_texts(int idx);
