@@ -85,12 +85,24 @@ Vec3f Model::vert(int i) {
   return verts[i];
 }
 
+Vec3f Model::vert(int iface, int nthvertex) {
+  return verts[ face_verts(iface)[nthvertex] ];
+}
+
 Vec3f Model::texture_vert(int i) {
   return textures[i];
 }
 
+Vec3f Model::texture_vert(int iface, int nthvert) {
+  return textures[ face_texts(iface)[nthvert] ];
+}
+
 Vec3f Model::vert_norm(int i) {
   return norms[i].normalize();
+}
+
+Vec3f Model::vert_norm(int iface, int nthvert) {
+  return norms[ face_norms(iface)[nthvert] ].normalize();
 }
 
 TGAColor Model::diffuse(Vec2f texture_coords) {

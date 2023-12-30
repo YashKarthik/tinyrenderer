@@ -135,9 +135,9 @@ int main(int argc, char** argv) {
     Vec3f vn[3];
 
     for (int j = 0; j < 3; j++) {
-      Vec3f v  = model->vert(face_vert[j]);
-      vt[j]    = model->texture_vert(face_text[j]);
-      vn[j]    = model->vert_norm(0);
+      Vec3f v  = model->vert(i, j);
+      vt[j]    = model->texture_vert(i, j);
+      vn[j]    = model->vert_norm(i, j);
 
       Vec3f temp        =  m2v(Viewport * Projection * View * ModelMatrix * v2m(v));
       screen_coords[j]  = Vec3f(int(temp.x), int(temp.y), int(temp.z));
@@ -165,7 +165,7 @@ int main(int argc, char** argv) {
 
   std::cout << "Writing render to file." << std::endl;
   render_image.flip_vertically();
-  render_image.write_tga_file("output.tga");
+  render_image.write_tga_file("debug-output.tga");
   delete model;
   return 0;
 }

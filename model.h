@@ -27,6 +27,10 @@ public:
   Vec3f texture_vert(int i);
   Vec3f vert_norm(int i);
 
+	Vec3f vert(int iface, int nthvertex);
+  Vec3f texture_vert(int iface, int nthvertex);
+  Vec3f vert_norm(int iface, int nthvertex);
+
 	std::vector<int> face_verts(int idx);
 	std::vector<int> face_texts(int idx);
 	std::vector<int> face_norms(int idx);
