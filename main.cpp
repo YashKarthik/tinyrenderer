@@ -82,7 +82,7 @@ int main(int argc, char** argv) {
   std::cout << "Done." << std::endl;
 
   render_image.flip_vertically();
-  render_image.write_tga_file("debug-output.tga");
+  render_image.write_tga_file("output.tga");
   delete model;
   return 0;
 }
