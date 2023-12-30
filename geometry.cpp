@@ -8,6 +8,17 @@ Matrix::Matrix(int r, int c):
   cols{c}
 {}
 
+Matrix::Matrix(Vec3f v):
+  m(std::vector<std::vector<float>>(4, std::vector<float>(1, 0.f))),
+  rows{4},
+  cols{1}
+{
+  m[0][0] = v.x;
+  m[1][0] = v.y;
+  m[2][0] = v.z;
+  m[3][0] = 1.f;
+}
+
 inline int Matrix::nrows() {return rows; }
 inline int Matrix::ncols() {return cols; }
 
@@ -108,4 +119,12 @@ std::ostream& operator<<(std::ostream& s, Matrix& m) {
     s << "\n";
   }
   return s;
+}
+
+Vec3f Matrix::toVec3f() {
+  return Vec3f(
+    m[0][0]/m[3][0],
+    m[1][0]/m[3][0],
+    m[2][0]/m[3][0]
+  );
 }

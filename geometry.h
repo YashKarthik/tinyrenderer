@@ -72,6 +72,9 @@ public:
   Matrix transpose();
   Matrix inverse();
 
+  Matrix(Vec3f v); // convert 3d vec to 4d homogeneous vec
+  Vec3f toVec3f(); // convert homogenous 4d vec/mat to 3d vec;
+
   friend std::ostream& operator<<(std::ostream& s, Matrix& m);
 };
 
