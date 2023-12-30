@@ -110,14 +110,6 @@ Matrix Matrix::inverse() {
   return truncate;
 }
 
-Vec3f Matrix::to_Vec3f() {
-  return Vec3f(
-    m[0][0]/m[3][0],
-    m[1][0]/m[3][0],
-    m[2][0]/m[3][0]
-  );
-}
-
 std::ostream& operator<<(std::ostream& s, Matrix& m) {
   for (int i=0; i<m.nrows(); i++)  {
     for (int j=0; j<m.ncols(); j++) {
@@ -127,4 +119,12 @@ std::ostream& operator<<(std::ostream& s, Matrix& m) {
     s << "\n";
   }
   return s;
+}
+
+Vec3f Matrix::to_Vec3f() {
+  return Vec3f(
+    m[0][0]/m[3][0],
+    m[1][0]/m[3][0],
+    m[2][0]/m[3][0]
+  );
 }

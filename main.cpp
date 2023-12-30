@@ -22,32 +22,23 @@ Model *model = NULL;
 struct GouraudShader : public IShader {
   Vec3f varying_intensity;
 
-  /* Responsibilities:
-  *   1. Reads (face, vertex) data from file.
-  *   2. Calculates intensity at vertices.
-  *   3. Transfroms scene's face into screen coordinates.
-  **/
   virtual Vec3f vertex(int iface, int nthvert) {
-    varying_intensity.raw[nthvert] = std::max(0.f, model->vert_norm(iface, nthvert)*light_dir);
-    Matrix gl_Vertex = Matrix(model->vert(iface, nthvert));
+    Vec3f gl_Vertex = (model->vert(iface, nthvert));
+    gl_Vertex = (Viewport * Projection * ModelView * gl_Vertex).to_Vec3f();
 
-    return (Viewport*Projection*ModelView*gl_Vertex).to_Vec3f();
+    varying_intensity.raw[nthvert] = std::max(0.f, model->vert_norm(iface, nthvert)*light_dir);
+    return gl_Vertex;
   }
 
-  /* Responsibilities:
-   *  1. Interpolates intensity values at current pixel.
-   *  2. Returns calculated color.
-   * */
   virtual bool fragment(Vec3f bar, TGAColor &color) {
     float intensity = varying_intensity*bar;
-    color = TGAColor(255*intensity, 255*intensity, 255*intensity, 255);
+    color = TGAColor(255, 255, 255, 255)*intensity;
     return false;
   }
 };
 
 
 int main() {
-
   model = new Model("./obj/african_head/african_head.obj", "./obj/african_head/african_head_diffuse.tga");
   //model = new Model("./obj/diablo3_pose/diablo3_pose.obj", "./obj/diablo3_pose/diablo3_pose_diffuse.tga");
 
@@ -59,22 +50,28 @@ int main() {
   projection(-1.f/(eye - center).norm());
   viewport(width/8, height/8, width*3/4, height*3/4);
   lookat(eye, center, Vec3f(0, 1, 0));
-
-  TGAImage rendered_image(width, height, TGAImage::RGB);
+  TGAImage render_image(width, height, TGAImage::RGB);
   GouraudShader shader;
 
   for (int i = 0; i < model->nfaces(); i++) {
     Vec3f screen_coords[3];
+    Vec3f vt[3];
+    Vec3f vn[3];
 
-    for (int j{0}; j < 3; j++) {
-      screen_coords[j] = shader.vertex(i, j);
+    for (int j = 0; j < 3; j++) {
+      vt[j]    = model->texture_vert(i, j);
+      vn[j]    = model->vert_norm(i, j);
+
+      Vec3f temp        =  shader.vertex(i, j);
+      screen_coords[j]  = Vec3f(int(temp.x), int(temp.y), int(temp.z));
     }
 
-    triangle(screen_coords, shader, rendered_image, z_buffer);
+    //triangle(screen_coords, vt, vn, z_buffer, render_image);
+    triangle(screen_coords, shader, render_image, z_buffer);
   }
 
-  rendered_image.flip_vertically();
-  rendered_image.write_tga_file("output.tga");
+  render_image.flip_vertically();
+  render_image.write_tga_file("output.tga");
   delete model;
   return 0;
 }

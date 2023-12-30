@@ -73,8 +73,7 @@ public:
   Matrix transpose();
   Matrix inverse();
 
-  // homogeneous to cartesian coordinates
-  Vec3f to_Vec3f();
+  Vec3f to_Vec3f(); // convert homogenous 4d vec/mat to 3d vec;
 
   friend std::ostream& operator<<(std::ostream& s, Matrix& m);
 };

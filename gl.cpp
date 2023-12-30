@@ -1,18 +1,16 @@
-#include "gl.h"
 #include "geometry.h"
 #include "model.h"
-#include "tgaimage.h"
+#include "gl.h"
 
-Matrix ModelView;
-Matrix Viewport;
 Matrix Projection;
+Matrix Viewport;
+Matrix ModelView;
 
+IShader::~IShader() {}
 
-/* Returns the Model*View matrix which tranforms
+/* Returns the View matrix which tranforms
  * the scene such that it appears as it
  * would appear if the camera was at `eye`
- *
- * Model is Identity so roped in with View
  *
  * Composed of the change of basis tranformation and translation for getting the eye/camera to the
  * origin. The order matters cuz we want the orientation transformation to happen relative to the
@@ -42,12 +40,12 @@ void lookat(Vec3f eye, Vec3f center, Vec3f up) {
     Tr[i][3] = -center.raw[i];
   }
 
-  Matrix ModelView = M_inv * Tr;
+  ModelView = M_inv * Tr;
 }
 
 // Matrix to map points in [-1,1] to image of [w, h]
 void viewport(int x, int y, int w, int h) {
-  Matrix Viewport = Matrix::identity(4);
+  Viewport = Matrix::identity(4);
   Viewport[0][3] = x+w/2.f;
   Viewport[1][3] = y+h/2.f;
   Viewport[2][3] = depth/2.f;
@@ -58,7 +56,7 @@ void viewport(int x, int y, int w, int h) {
 }
 
 void projection(float coeff) {
-  Matrix Projection = Matrix::identity(4);
+  Projection = Matrix::identity(4);
   Projection[3][2] = coeff;
 }
 
@@ -118,7 +116,7 @@ Vec3f barycentric(Vec3f *pts, Vec3f P) {
  *  int x = idx % width;
  *  int y = idx / width;
  * */
-void triangle(Vec3f *pts, IShader &shader, TGAImage &image, float z_buffer[]) {
+void triangle(Vec3f *pts, Vec3f *texture_pts, Vec3f *vertex_normals, float z_buffer[], TGAImage &image) {
 
   Vec2f bounding_box_min(std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
   Vec2f bounding_box_max(-std::numeric_limits<float>::max(), -std::numeric_limits<float>::max());
@@ -138,6 +136,7 @@ void triangle(Vec3f *pts, IShader &shader, TGAImage &image, float z_buffer[]) {
   }
 
   Vec3f P;
+  Vec3f n;
   /* For each vector in the bounding box
    * Check if it's in (2d proj of) the triangle too.
    * Check if it's the forward-most point in the z-buffer.
@@ -154,17 +153,70 @@ void triangle(Vec3f *pts, IShader &shader, TGAImage &image, float z_buffer[]) {
        * Weighted avg of the cartesian coordiantes of the corners! (for each component)
        **/
       P.z = 0;
+      Vec2f texture_coord(0., 0.);
+      for (int i{0}; i < 3; i++) {
+        P.z += pts[i].z * bary_coords.raw[i];
+
+        texture_coord.x += texture_pts[i].x * bary_coords.raw[i];
+        texture_coord.y += texture_pts[i].y * bary_coords.raw[i];
+
+        n.x += vertex_normals[i].x * bary_coords.raw[i];
+        n.y += vertex_normals[i].y * bary_coords.raw[i];
+        n.z += vertex_normals[i].z * bary_coords.raw[i];
+      }
+
+      float intensity = n*light_dir;
+      //if (intensity < 0) return;
+
+      if (z_buffer[int(P.x + P.y * width)] >= P.z) continue;
+      z_buffer[(int)(P.x + P.y * width)] = P.z;
+
+      TGAColor color = model->diffuse(texture_coord);
+
+      image.set(P.x, P.y, TGAColor(
+        (color.r),
+        (color.g),
+        (color.b),
+        255
+      ));
+    }
+
+  }
+}
+
+void triangle(Vec3f *pts, IShader &shader, TGAImage &image, float z_buffer[]) {
+
+  Vec2f bounding_box_min(std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
+  Vec2f bounding_box_max(-std::numeric_limits<float>::max(), -std::numeric_limits<float>::max());
+  Vec2f clamp(image.get_width()-1, image.get_height()-1);
+
+  for (int i{0}; i < 3; i++) {
+    bounding_box_min.x = std::max(0.f, std::min(pts[i].x, bounding_box_min.x));
+    bounding_box_min.y = std::max(0.f, std::min(pts[i].y, bounding_box_min.y));
+
+    bounding_box_max.x = std::min(clamp.x, std::max(pts[i].x, bounding_box_max.x));
+    bounding_box_max.y = std::min(clamp.y, std::max(pts[i].y, bounding_box_max.y));
+  }
+
+  Vec3f P;
+  for (P.x = bounding_box_min.x; P.x <= bounding_box_max.x; P.x++) {
+    for (P.y = bounding_box_min.y; P.y <= bounding_box_max.y; P.y++) {
+
+      Vec3f bary_coords = barycentric(pts, P);
+      if (bary_coords.x < 0 || bary_coords.y < 0 || bary_coords.z < 0) continue;
+
+      P.z = 0;
       for (int i{0}; i < 3; i++) {
         P.z += pts[i].z * bary_coords.raw[i];
       }
 
-      if (z_buffer[int(P.x + P.y * width)] >= P.z) continue;
-      z_buffer[(int)(P.x + P.y * width)] = P.z;
+      if (z_buffer[int(P.x + P.y * width)] > P.z) continue;
 
       TGAColor color;
       bool discard = shader.fragment(bary_coords, color);
       if (discard) continue;
 
+      z_buffer[(int)(P.x + P.y * width)] = P.z;
       image.set(P.x, P.y, color);
     }
 
