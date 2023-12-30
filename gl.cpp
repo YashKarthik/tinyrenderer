@@ -4,7 +4,9 @@
 
 Matrix Projection;
 Matrix Viewport;
-Matrix View;
+Matrix ModelView;
+
+IShader::~IShader() {}
 
 /* Returns the View matrix which tranforms
  * the scene such that it appears as it
@@ -38,7 +40,7 @@ void lookat(Vec3f eye, Vec3f center, Vec3f up) {
     Tr[i][3] = -center.raw[i];
   }
 
-  View = M_inv * Tr;
+  ModelView = M_inv * Tr;
 }
 
 // Matrix to map points in [-1,1] to image of [w, h]

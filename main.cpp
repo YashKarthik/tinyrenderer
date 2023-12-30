@@ -19,6 +19,24 @@ Vec3f eye(1, 1, 3);
 Vec3f center(0, 0, 0);
 Model *model = NULL;
 
+struct GouraudShader : public IShader {
+    Vec3f varying_intensity;
+
+    virtual Vec3f vertex(int iface, int nthvert) {
+        Vec3f gl_Vertex = (model->vert(iface, nthvert));
+        gl_Vertex = (Viewport * Projection * ModelView * gl_Vertex).toVec3f();
+
+        varying_intensity.raw[nthvert] = std::max(0.f, model->vert_norm(iface, nthvert)*light_dir);
+        return gl_Vertex;
+    }
+
+    virtual bool fragment(Vec3f bar, TGAColor &color) {
+        float intensity = varying_intensity*bar;
+        color = TGAColor(255, 255, 255, 255)*intensity;
+        return false;
+    }
+};
+
 
 int main(int argc, char** argv) {
 
@@ -34,55 +52,34 @@ int main(int argc, char** argv) {
   for (int i{0}; i < width*height; i++) {
     z_buffer[i] = -std::numeric_limits<float>::max();
   }
-  std::cout << "Initialized z-buffer." << std::endl;
 
   projection(-1.f/(eye - center).norm());
   viewport(width/8, height/8, width*3/4, height*3/4);
   lookat(eye, center, Vec3f(0, 1, 0));
-
   TGAImage render_image(width, height, TGAImage::RGB);
+  GouraudShader shader;
 
-  std::cout << "Painting triangles --- ";
   for (int i = 0; i < model->nfaces(); i++) {
     std::vector<int> face_vert  = model->face_verts(i);
     std::vector<int> face_text  = model->face_texts(i);
     std::vector<int> face_norms = model->face_norms(i);
 
     Vec3f screen_coords[3];
-    Vec3f world_coords[3];
     Vec3f vt[3];
     Vec3f vn[3];
 
     for (int j = 0; j < 3; j++) {
-      Vec3f v  = model->vert(i, j);
       vt[j]    = model->texture_vert(i, j);
       vn[j]    = model->vert_norm(i, j);
 
-      Vec3f temp        =  (Viewport * Projection * View * Matrix(v)).toVec3f();
+      Vec3f temp        =  shader.vertex(i, j);
       screen_coords[j]  = Vec3f(int(temp.x), int(temp.y), int(temp.z));
-
-      world_coords[j]   = v;
     }
-
-    //Vec3f n = ((world_coords[2]-world_coords[0])^(world_coords[1]-world_coords[0])).normalize();
-    //float intensity = n*light_dir;
 
     triangle(screen_coords, vt, vn, z_buffer, render_image);
   }
   std::cout << "Done." << std::endl;
 
-  std::cout << "Dumping z-buffer." << std::endl;
-  TGAImage zb_image(width, height, TGAImage::GRAYSCALE);
-  for (int i = 0; i < width; i++) {
-    for (int j = 0; j < height; j++) {
-      zb_image.set(i, j, TGAColor(((z_buffer[i + j*width]))*255, 255));
-    }
-  }
-  zb_image.flip_vertically(); // i want to have the origin at the left bottom corner of the image
-  zb_image.write_tga_file("zbuffer.tga");
-  std::cout << "Done." << std::endl;
-
-  std::cout << "Writing render to file." << std::endl;
   render_image.flip_vertically();
   render_image.write_tga_file("debug-output.tga");
   delete model;
