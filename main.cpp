@@ -19,57 +19,6 @@ Vec3f eye(1, 1, 3);
 Vec3f center(0, 0, 0);
 Model *model = NULL;
 
-// Model matrix expresses objects in world coordinates
-// object (local) coords -> world
-Matrix ModelMatrix = Matrix::identity(4);
-
-/* Returns the View matrix which tranforms
- * the scene such that it appears as it
- * would appear if the camera was at `eye`
- *
- * Composed of the change of basis tranformation and translation for getting the eye/camera to the
- * origin. The order matters cuz we want the orientation transformation to happen relative to the
- * camera at the origin.
- *
- * View = M_inv * Tr;
- *
- * M^-1 = [x' y' z']( [x y z] - [cx cy cz] )^1
- * M^-1 = -[x' y' z'][cx cy cz]^-1
- * M_inv "undos" the rotation. So where the current basis vectors would land in a regular (i,j,k)
- * system.
- *
- **/
-Matrix lookat(Vec3f eye, Vec3f center, Vec3f up) {
-  Vec3f O_z = (eye - center).normalize();
-  Vec3f O_x = (up ^ O_z).normalize(); // cross product
-  Vec3f O_y = (O_z ^ O_x).normalize();
-  
-  Matrix M_inv = Matrix::identity(4);
-  Matrix Tr = Matrix::identity(4);
-
-  for (int i{0}; i < 3; i++) {
-    M_inv[0][i] = O_x.raw[i];
-    M_inv[1][i] = O_y.raw[i];
-    M_inv[2][i] = O_z.raw[i];
-
-    Tr[i][3] = -center.raw[i];
-  }
-
-  return M_inv * Tr;
-}
-
-// Matrix to map points in [-1,1] to image of [w, h]
-Matrix viewport(int x, int y, int w, int h) {
-  Matrix m = Matrix::identity(4);
-  m[0][3] = x+w/2.f;
-  m[1][3] = y+h/2.f;
-  m[2][3] = depth/2.f;
-
-  m[0][0] = w/2.f;
-  m[1][1] = h/2.f;
-  m[2][2] = depth/2.f;
-  return m;
-}
 
 int main(int argc, char** argv) {
 
@@ -87,11 +36,9 @@ int main(int argc, char** argv) {
   }
   std::cout << "Initialized z-buffer." << std::endl;
 
-  Matrix Projection = Matrix::identity(4);
-  Matrix Viewport = viewport(width/8, height/8, width*3/4, height*3/4);
-  Matrix View = lookat(eye, center, Vec3f(0, 1, 0));
-
-  Projection[3][2] = -1.f/(eye - center).norm();
+  projection(-1.f/(eye - center).norm());
+  viewport(width/8, height/8, width*3/4, height*3/4);
+  lookat(eye, center, Vec3f(0, 1, 0));
 
   TGAImage render_image(width, height, TGAImage::RGB);
 
@@ -111,7 +58,7 @@ int main(int argc, char** argv) {
       vt[j]    = model->texture_vert(i, j);
       vn[j]    = model->vert_norm(i, j);
 
-      Vec3f temp        =  (Viewport * Projection * View * ModelMatrix * Matrix(v)).toVec3f();
+      Vec3f temp        =  (Viewport * Projection * View * Matrix(v)).toVec3f();
       screen_coords[j]  = Vec3f(int(temp.x), int(temp.y), int(temp.z));
 
       world_coords[j]   = v;

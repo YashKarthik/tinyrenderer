@@ -2,6 +2,62 @@
 #include "model.h"
 #include "gl.h"
 
+Matrix Projection;
+Matrix Viewport;
+Matrix View;
+
+/* Returns the View matrix which tranforms
+ * the scene such that it appears as it
+ * would appear if the camera was at `eye`
+ *
+ * Composed of the change of basis tranformation and translation for getting the eye/camera to the
+ * origin. The order matters cuz we want the orientation transformation to happen relative to the
+ * camera at the origin.
+ *
+ * View = M_inv * Tr;
+ *
+ * M^-1 = [x' y' z']( [x y z] - [cx cy cz] )^1
+ * M^-1 = -[x' y' z'][cx cy cz]^-1
+ * M_inv "undos" the rotation. So where the current basis vectors would land in a regular (i,j,k)
+ * system.
+ *
+ **/
+void lookat(Vec3f eye, Vec3f center, Vec3f up) {
+  Vec3f O_z = (eye - center).normalize();
+  Vec3f O_x = (up ^ O_z).normalize(); // cross product
+  Vec3f O_y = (O_z ^ O_x).normalize();
+  
+  Matrix M_inv = Matrix::identity(4);
+  Matrix Tr = Matrix::identity(4);
+
+  for (int i{0}; i < 3; i++) {
+    M_inv[0][i] = O_x.raw[i];
+    M_inv[1][i] = O_y.raw[i];
+    M_inv[2][i] = O_z.raw[i];
+
+    Tr[i][3] = -center.raw[i];
+  }
+
+  View = M_inv * Tr;
+}
+
+// Matrix to map points in [-1,1] to image of [w, h]
+void viewport(int x, int y, int w, int h) {
+  Viewport = Matrix::identity(4);
+  Viewport[0][3] = x+w/2.f;
+  Viewport[1][3] = y+h/2.f;
+  Viewport[2][3] = depth/2.f;
+
+  Viewport[0][0] = w/2.f;
+  Viewport[1][1] = h/2.f;
+  Viewport[2][2] = depth/2.f;
+}
+
+void projection(float coeff) {
+  Projection = Matrix::identity(4);
+  Projection[3][2] = -1.f/(eye - center).norm();
+}
+
 /* Returns the barycentric coordinates of a point>
  *
  * If any of the barycentric coordinates (the masses)
