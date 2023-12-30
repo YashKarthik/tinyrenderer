@@ -20,21 +20,21 @@ Vec3f center(0, 0, 0);
 Model *model = NULL;
 
 struct GouraudShader : public IShader {
-    Vec3f varying_intensity;
+  Vec3f varying_intensity;
 
-    virtual Vec3f vertex(int iface, int nthvert) {
-        Vec3f gl_Vertex = (model->vert(iface, nthvert));
-        gl_Vertex = (Viewport * Projection * ModelView * gl_Vertex).toVec3f();
+  virtual Vec3f vertex(int iface, int nthvert) {
+    Vec3f gl_Vertex = (model->vert(iface, nthvert));
+    gl_Vertex = (Viewport * Projection * ModelView * gl_Vertex).toVec3f();
 
-        varying_intensity.raw[nthvert] = std::max(0.f, model->vert_norm(iface, nthvert)*light_dir);
-        return gl_Vertex;
-    }
+    varying_intensity.raw[nthvert] = std::max(0.f, model->vert_norm(iface, nthvert)*light_dir);
+    return gl_Vertex;
+  }
 
-    virtual bool fragment(Vec3f bar, TGAColor &color) {
-        float intensity = varying_intensity*bar;
-        color = TGAColor(255, 255, 255, 255)*intensity;
-        return false;
-    }
+  virtual bool fragment(Vec3f bar, TGAColor &color) {
+    float intensity = varying_intensity*bar;
+    color = TGAColor(255, 255, 255, 255)*intensity;
+    return false;
+  }
 };
 
 
@@ -76,7 +76,8 @@ int main(int argc, char** argv) {
       screen_coords[j]  = Vec3f(int(temp.x), int(temp.y), int(temp.z));
     }
 
-    triangle(screen_coords, vt, vn, z_buffer, render_image);
+    //triangle(screen_coords, vt, vn, z_buffer, render_image);
+    triangle(screen_coords, shader, render_image, z_buffer);
   }
   std::cout << "Done." << std::endl;
 

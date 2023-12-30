@@ -183,3 +183,48 @@ void triangle(Vec3f *pts, Vec3f *texture_pts, Vec3f *vertex_normals, float z_buf
 
   }
 }
+
+void triangle(Vec3f *pts, IShader &shader, TGAImage &image, float z_buffer[]) {
+
+  Vec2f bounding_box_min(std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
+  Vec2f bounding_box_max(-std::numeric_limits<float>::max(), -std::numeric_limits<float>::max());
+  Vec2f clamp(image.get_width()-1, image.get_height()-1);
+
+  for (int i{0}; i < 3; i++) {
+    bounding_box_min.x = std::max(0.f, std::min(pts[i].x, bounding_box_min.x));
+    bounding_box_min.y = std::max(0.f, std::min(pts[i].y, bounding_box_min.y));
+
+    bounding_box_max.x = std::min(clamp.x, std::max(pts[i].x, bounding_box_max.x));
+    bounding_box_max.y = std::min(clamp.y, std::max(pts[i].y, bounding_box_max.y));
+  }
+
+  Vec3f P;
+  for (P.x = bounding_box_min.x; P.x <= bounding_box_max.x; P.x++) {
+    for (P.y = bounding_box_min.y; P.y <= bounding_box_max.y; P.y++) {
+
+      Vec3f bary_coords = barycentric(pts, P);
+      if (bary_coords.x < 0 || bary_coords.y < 0 || bary_coords.z < 0) continue;
+
+      P.z = 0;
+      for (int i{0}; i < 3; i++) {
+        P.z += pts[i].z * bary_coords.raw[i];
+      }
+
+      if (z_buffer[int(P.x + P.y * width)] > P.z) continue;
+
+      TGAColor color;
+      bool discard = shader.fragment(bary_coords, color);
+      if (discard) continue;
+
+      z_buffer[(int)(P.x + P.y * width)] = P.z;
+      image.set(P.x, P.y, color);
+    }
+
+  }
+}
+
+
+// float z = pts[0][2]*c.x + pts[1][2]*c.y + pts[2][2]*c.z;
+// float w = pts[0][3]*c.x + pts[1][3]*c.y + pts[2][3]*c.z;
+//
+// (pts[0].z/w)*c.z + (pts[1].z/w)*c.z + (pts[2].z/w)*c.z
