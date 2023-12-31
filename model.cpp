@@ -7,7 +7,13 @@
 #include "model.h"
 #include <iostream>
 
-Model::Model(const char *obj_file, const char *texts_file, const char *nm_file) : verts(), faces_verts() {
+Model::Model(
+  const char *obj_file,
+  const char *texts_file,
+  const char *nm_file,
+  const char *spec_file
+) : verts(), faces_verts() {
+
   std::ifstream in;
   in.open (obj_file, std::ifstream::in);
   if (in.fail()) return;
@@ -55,8 +61,11 @@ Model::Model(const char *obj_file, const char *texts_file, const char *nm_file) 
       faces_norms.push_back(f_norms);
     }
   }
+
   load_map(texts_file, diffuse_map);
   load_map(nm_file, normal_map);
+  load_map(spec_file, specular_map);
+
   std::cerr << "# v# " << verts.size() << " f# "  << faces_verts.size() << std::endl;
 }
 
@@ -133,6 +142,15 @@ Vec3f Model::normal(Vec2f uv) {
     res.raw[2 - i] = (float)c.raw[i]/255.f*2.f - 1.f;
   }
   return res;
+}
+
+float Model::specular(Vec2f uvf) {
+  Vec2i uv(
+    uvf.x*specular_map.get_width(),
+    uvf.y*specular_map.get_height()
+  );
+
+  return specular_map.get(uv.x, uv.y).raw[0]/1.f;
 }
 
 void Model::load_map(const char* texts_file, TGAImage &img) {

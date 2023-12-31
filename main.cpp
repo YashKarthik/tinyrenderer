@@ -44,9 +44,18 @@ struct Shader : public IShader {
 
     Vec3f n = (uniform_MIT * Matrix(model->normal(uv))).to_Vec3f().normalize();
     Vec3f l = (uniform_M * Matrix(light_dir)).to_Vec3f().normalize();
-    float intensity = std::max(0.f, n*l);
+    Vec3f r = (n*(n*l*2.f) - l).normalize(); // reflected ray
 
-    color = model->diffuse(uv)*intensity;
+    float spec = pow(std::max(r.z, 0.f), model->specular(uv));
+    float diff = std::max(0.f, n*l);
+
+    TGAColor c = model->diffuse(uv);
+    color = c;
+
+    for (int i{0}; i < 3; i++) {
+      color.raw[i] = std::min<float>(3 + c.raw[i]*(diff + 1.2*spec), 255);
+    }
+
     return false;
   }
 };
@@ -56,7 +65,8 @@ int main() {
   model = new Model(
     "./obj/african_head/african_head.obj",
     "./obj/african_head/african_head_diffuse.tga",
-    "./obj/african_head/african_head_nm_tangent.tga"
+    "./obj/african_head/african_head_nm_tangent.tga",
+    "./obj/african_head/african_head_spec.tga"
   );
   //model = new Model("./obj/diablo3_pose/diablo3_pose.obj", "./obj/diablo3_pose/diablo3_pose_diffuse.tga");
 
@@ -88,7 +98,6 @@ int main() {
       screen_coords[j]  = Vec3f(int(temp.x), int(temp.y), int(temp.z));
     }
 
-    //triangle(screen_coords, vt, vn, z_buffer, render_image);
     triangle(screen_coords, shader, render_image, z_buffer);
   }
 

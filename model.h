@@ -17,13 +17,15 @@ private:
 
   TGAImage diffuse_map{};
   TGAImage normal_map{};
+  TGAImage specular_map{};
   void load_map(const char* texts_file, TGAImage& img);
 
 public:
 	Model(
     const char *obj_file,
     const char *texts_file,
-    const char *nm_file
+    const char *nm_file,
+    const char *spec_file
   );
 	~Model();
 	int nverts();
@@ -43,6 +45,7 @@ public:
 
   TGAColor diffuse(Vec2f texture_coords);
   Vec3f normal(Vec2f texture_coords);
+  float specular(Vec2f uvf);
 };
 
 #endif //__MODEL_H__
