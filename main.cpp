@@ -14,25 +14,34 @@
 const int width = 800;
 const int height = 800;
 const int depth = 255;
-Vec3f light_dir = Vec3f(1, 1, -1).normalize();
+Vec3f light_dir = Vec3f(1,1,1).normalize();
 Vec3f eye(1, 1, 3);
 Vec3f center(0, 0, 0);
 Model *model = NULL;
 
 struct GouraudShader : public IShader {
   Vec3f varying_intensity;
+  Vec3f varying_textures[3];
 
   virtual Vec3f vertex(int iface, int nthvert) {
+    varying_intensity.raw[nthvert] = std::max(0.f, model->vert_norm(iface, nthvert)*light_dir);
+    varying_textures[nthvert] = model->texture_vert(iface, nthvert);
+
     Vec3f gl_Vertex = (model->vert(iface, nthvert));
     gl_Vertex = (Viewport * Projection * ModelView * gl_Vertex).to_Vec3f();
-
-    varying_intensity.raw[nthvert] = std::max(0.f, model->vert_norm(iface, nthvert)*light_dir);
     return gl_Vertex;
   }
 
   virtual bool fragment(Vec3f bar, TGAColor &color) {
     float intensity = varying_intensity*bar;
-    color = TGAColor(255, 255, 255, 255)*intensity;
+
+    Vec2f texture_coord(0.f, 0.f);
+    for (int i{0}; i < 3; i++) {
+      texture_coord.x += varying_textures[i].x * bar.raw[i];
+      texture_coord.y += varying_textures[i].y * bar.raw[i];
+    }
+
+    color = model->diffuse(texture_coord)*intensity;
     return false;
   }
 };
