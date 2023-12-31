@@ -16,9 +16,15 @@ private:
   std::vector<std::vector<int>> faces_norms{};
 
   TGAImage diffuse_map{};
-  void load_textures(const char* texts_file, TGAImage& img);
+  TGAImage normal_map{};
+  void load_map(const char* texts_file, TGAImage& img);
+
 public:
-	Model(const char *obj_file, const char *texts_file);
+	Model(
+    const char *obj_file,
+    const char *texts_file,
+    const char *nm_file
+  );
 	~Model();
 	int nverts();
 	int nfaces();
@@ -36,6 +42,7 @@ public:
 	std::vector<int> face_norms(int idx);
 
   TGAColor diffuse(Vec2f texture_coords);
+  Vec3f normal(Vec2f texture_coords);
 };
 
 #endif //__MODEL_H__

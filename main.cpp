@@ -19,12 +19,14 @@ Vec3f eye(1, 1, 3);
 Vec3f center(0, 0, 0);
 Model *model = NULL;
 
-struct GouraudShader : public IShader {
-  Vec3f varying_intensity;
+struct Shader : public IShader {
   Vec3f varying_textures[3];
 
+  // uniform is used to signify that these variables are constant for shader instance
+  Matrix uniform_M;           // Projection * ModelView;
+  Matrix uniform_MIT;         // (Projection * ModelView).invert_transpose();
+
   virtual Vec3f vertex(int iface, int nthvert) {
-    varying_intensity.raw[nthvert] = std::max(0.f, model->vert_norm(iface, nthvert)*light_dir);
     varying_textures[nthvert] = model->texture_vert(iface, nthvert);
 
     Vec3f gl_Vertex = (model->vert(iface, nthvert));
@@ -33,22 +35,29 @@ struct GouraudShader : public IShader {
   }
 
   virtual bool fragment(Vec3f bar, TGAColor &color) {
-    float intensity = varying_intensity*bar;
 
-    Vec2f texture_coord(0.f, 0.f);
+    Vec2f uv(0.f, 0.f);
     for (int i{0}; i < 3; i++) {
-      texture_coord.x += varying_textures[i].x * bar.raw[i];
-      texture_coord.y += varying_textures[i].y * bar.raw[i];
+      uv.x += varying_textures[i].x * bar.raw[i];
+      uv.y += varying_textures[i].y * bar.raw[i];
     }
 
-    color = model->diffuse(texture_coord)*intensity;
+    Vec3f n = (uniform_MIT * Matrix(model->normal(uv))).to_Vec3f().normalize();
+    Vec3f l = (uniform_M * Matrix(light_dir)).to_Vec3f().normalize();
+    float intensity = std::max(0.f, n*l);
+
+    color = model->diffuse(uv)*intensity;
     return false;
   }
 };
 
 
 int main() {
-  model = new Model("./obj/african_head/african_head.obj", "./obj/african_head/african_head_diffuse.tga");
+  model = new Model(
+    "./obj/african_head/african_head.obj",
+    "./obj/african_head/african_head_diffuse.tga",
+    "./obj/african_head/african_head_nm_tangent.tga"
+  );
   //model = new Model("./obj/diablo3_pose/diablo3_pose.obj", "./obj/diablo3_pose/diablo3_pose_diffuse.tga");
 
   float z_buffer[width*height];
@@ -59,8 +68,12 @@ int main() {
   projection(-1.f/(eye - center).norm());
   viewport(width/8, height/8, width*3/4, height*3/4);
   lookat(eye, center, Vec3f(0, 1, 0));
+
   TGAImage render_image(width, height, TGAImage::RGB);
-  GouraudShader shader;
+  Shader shader;
+
+  shader.uniform_M = Projection * ModelView;
+  shader.uniform_MIT = (Projection * ModelView).inverse().transpose();
 
   for (int i = 0; i < model->nfaces(); i++) {
     Vec3f screen_coords[3];

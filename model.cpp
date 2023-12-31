@@ -3,10 +3,11 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include "geometry.h"
 #include "model.h"
 #include <iostream>
 
-Model::Model(const char *obj_file, const char *texts_file) : verts(), faces_verts() {
+Model::Model(const char *obj_file, const char *texts_file, const char *nm_file) : verts(), faces_verts() {
   std::ifstream in;
   in.open (obj_file, std::ifstream::in);
   if (in.fail()) return;
@@ -54,7 +55,8 @@ Model::Model(const char *obj_file, const char *texts_file) : verts(), faces_vert
       faces_norms.push_back(f_norms);
     }
   }
-  load_textures(texts_file, diffuse_map);
+  load_map(texts_file, diffuse_map);
+  load_map(nm_file, normal_map);
   std::cerr << "# v# " << verts.size() << " f# "  << faces_verts.size() << std::endl;
 }
 
@@ -105,14 +107,35 @@ Vec3f Model::vert_norm(int iface, int nthvert) {
   return norms[ face_norms(iface)[nthvert] ].normalize();
 }
 
-TGAColor Model::diffuse(Vec2f texture_coords) {
+TGAColor Model::diffuse(Vec2f uv) {
   return diffuse_map.get(
-    texture_coords.x * diffuse_map.get_width(),
-    texture_coords.y * diffuse_map.get_height()
+    uv.x * diffuse_map.get_width(),
+    uv.y * diffuse_map.get_height()
   );
 }
 
-void Model::load_textures(const char* texts_file, TGAImage &img) {
+Vec3f Model::normal(Vec2f uv) {
+  TGAColor c = normal_map.get(
+    uv.x * normal_map.get_width(),
+    uv.y * normal_map.get_height()
+  );
+
+  /* Mapping rgb values to vector space:
+   *  1. Normalize rgb into range [0, 1]: float div by 255.
+   *  2. Map [0, 1] to [-1 , 1]: x*2 - 1
+   *  3. Construct vector.
+   *
+   * In TGAColor, raw is [ b, g, r, a ], hence the res.raw[2 - i];
+   **/
+
+  Vec3f res;
+  for (int i{0}; i < 3; i++) {
+    res.raw[2 - i] = (float)c.raw[i]/255.f*2.f - 1.f;
+  }
+  return res;
+}
+
+void Model::load_map(const char* texts_file, TGAImage &img) {
   std::cerr << "Texture file " << texts_file << " loading " << (img.read_tga_file(texts_file) ? "Loaded textures." : "failed") << std::endl;
   img.flip_vertically();
 }
