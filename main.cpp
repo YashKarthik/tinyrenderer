@@ -65,10 +65,15 @@ int main() {
   model = new Model(
     "./obj/african_head/african_head.obj",
     "./obj/african_head/african_head_diffuse.tga",
-    "./obj/african_head/african_head_nm_tangent.tga",
+    "./obj/african_head/african_head_nm.tga",
     "./obj/african_head/african_head_spec.tga"
   );
-  //model = new Model("./obj/diablo3_pose/diablo3_pose.obj", "./obj/diablo3_pose/diablo3_pose_diffuse.tga");
+  //model = new Model(
+  //  "./obj/diablo3_pose/diablo3_pose.obj",
+  //  "./obj/diablo3_pose/diablo3_pose_diffuse.tga",
+  //  "./obj/diablo3_pose/diablo3_pose_nm.tga",
+  //  "./obj/diablo3_pose/diablo3_pose_spec.tga"
+  //);
 
   float z_buffer[width*height];
   for (int i{0}; i < width*height; i++) {
